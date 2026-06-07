@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HRMS.Domain\HRMS.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Features\Employees\" />
+    <Folder Include="Features\Attendance\" />
+    <Folder Include="Features\Requests\" />
+    <Folder Include="Features\Payroll\" />
+    <Folder Include="Interfaces\" />
+  </ItemGroup>
+
+</Project>

@@ -55,3 +55,31 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# ============================================================================
+# CẤU HÌNH BỔ SUNG CHO DỰ ÁN NHÓM (SENIOR RECOMMENDATION)
+# ============================================================================
+
+# 1. Thư mục ẩn của Visual Studio (CỰC KỲ QUAN TRỌNG)
+# Nơi lưu cache, lịch sử mở file, layout cửa sổ của riêng MÁY CÁ NHÂN. 
+# Nếu push cái này lên, máy khác mở ra sẽ bị loạn giao diện hoặc lỗi debug.
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# 2. Cấu hình của các IDE khác (Phòng trường hợp trong nhóm có ai khác dùng VS Code hoặc Rider)
+.vscode/
+.idea/
+*.sln.iml
+
+# 3. File Database cục bộ (Nếu có sinh ra lúc chạy LocalDB)
+*.mdf
+*.ldf
+*.localdb
+
+# 4. File rác của Hệ điều hành (Windows / macOS)
+Thumbs.db
+Desktop.ini
+.DS_Store
