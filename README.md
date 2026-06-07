@@ -1,31 +1,29 @@
 
 # Project-Web.Human-Resource-Management-System.HRMS
 
-  
-
 ### Chào mấy con vợ: Khi vào dự án này, hãy ĐẶC BIỆT chú ý tới những file sau:
 
-1. Docs: https://docs.google.com/document/d/1dT4ZyOBEbMBzGvgAXXYbpmLpOL4IR4lEg6m9SkzpQ1Y/edit?usp=sharing
+1. [Docs](https://docs.google.com/document/d/1dT4ZyOBEbMBzGvgAXXYbpmLpOL4IR4lEg6m9SkzpQ1Y/edit?usp=sharing)
 
 -> Đây là file document dự án, nơi mà phác thảo soạn lên, nơi mà các tính năng sẽ làm.
 
-2. structure.md
+2. [structure.md](./structure.md)
 
 -> Cấu trúc dự án
 
-3. guideline.md
+3. [guideline.md](./guideline.md)
 
 -> Quy trình và ma thuật để làm dự án
 
-4. Agent.md
+4. [Agent.md](./Agent.md)
 
 -> Bộ quy tắc cho agent để code
 
-5. DatabaseInfo.md
+5. [DatabaseInfo.md](./DatabaseInfo.md)
 
 -> Khởi tạo database cho dự án
 
-6. HRMS.md
+6. [HRMS.md](./HRMS.md)
 
 -> File tasks của dự án
 
@@ -57,7 +55,7 @@ Muốn làm cái gì mới -> Pull từ main về nhánh local của mình -> Do
 
 2. <strong>Về nhiệm vụ và nghiệp vụ</strong>
 
-- <strong>Hãy khởi tạo database và thêm mẫu</strong> theo những gì đã có trong DatabaseInfo.md
+- <strong>Hãy khởi tạo database và thêm mẫu</strong> theo những gì đã có trong [DatabaseInfo.md](./DatabaseInfo.md)  
 
 - <strong>Thay đổi phần thông tin kết nối trong appsetting.json</strong> để có thể sử dụng và code
 
