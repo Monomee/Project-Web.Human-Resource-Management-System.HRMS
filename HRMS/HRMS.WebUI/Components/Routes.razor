@@ -1,6 +1,24 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                @if (context.User.Identity?.IsAuthenticated == false)
+                {
+                    <RedirectToLogin />
+                }
+                else
+                {
+                    <div class="container mt-5">
+                        <div class="alert alert-danger text-center shadow-sm p-4" style="max-width: 500px; margin: 0 auto; border-radius: 12px;">
+                            <span class="bi bi-exclamation-triangle-fill text-danger fs-1 mb-3 d-block"></span>
+                            <h4 class="alert-heading fw-bold">Không Có Quyền Truy Cập!</h4>
+                            <p class="text-muted small mb-4">Bạn không có quyền truy cập vào chức năng hoặc trang này. Vui lòng liên hệ với quản trị viên.</p>
+                            <a href="" class="btn btn-primary px-4 py-2" style="border-radius: 8px;">Quay lại Trang chủ</a>
+                        </div>
+                    </div>
+                }
+            </NotAuthorized>
+        </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>

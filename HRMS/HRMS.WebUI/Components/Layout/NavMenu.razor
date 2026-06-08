@@ -1,30 +1,116 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+@using System.Security.Claims
+
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">HRMS.WebUI</a>
+        <!-- Logo và Tên thương hiệu -->
+        <a class="navbar-brand-custom" href="">
+            <i class="bi bi-shield-lock-fill me-2 fs-4"></i> HRMS Portal
+        </a>
+
+        <!-- Nút toggler trên mobile (Dùng thuần Blazor State để toggle) -->
+        <button class="navbar-toggler" type="button" @onclick="ToggleNavMenu" aria-controls="navbarNav" aria-expanded="@(!_isNavCollapsed)" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse @(_isNavCollapsed ? "" : "show")" id="navbarNav">
+            <AuthorizeView Context="authContext">
+                <Authorized>
+                    <!-- Menu trái: Các liên kết điều hướng chức năng -->
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item">
+                            <NavLink class="nav-link" href="" Match="NavLinkMatch.All" @onclick="CloseNavMenu">
+                                <i class="bi bi-grid-1x2-fill me-1"></i> Trang chủ
+                            </NavLink>
+                        </li>
+
+                        <!-- Các liên kết quản trị dành cho Admin, HRM, HR -->
+                        <AuthorizeView Roles="Admin,HRM,HR" Context="adminContext">
+                            <Authorized>
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="employees" @onclick="CloseNavMenu">
+                                        <i class="bi bi-people-fill me-1"></i> Nhân sự
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="attendance/import" @onclick="CloseNavMenu">
+                                        <i class="bi bi-calendar2-check-fill me-1"></i> Chấm công
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="requests/approvals" @onclick="CloseNavMenu">
+                                        <i class="bi bi-check-all me-1"></i> Duyệt đơn
+                                    </NavLink>
+                                </li>
+                            </Authorized>
+                        </AuthorizeView>
+
+                        <li class="nav-item">
+                            <NavLink class="nav-link" href="requests/create" @onclick="CloseNavMenu">
+                                <i class="bi bi-file-earmark-plus-fill me-1"></i> Gửi đơn
+                            </NavLink>
+                        </li>
+
+                        <!-- Các liên kết dành riêng cho Admin, HRM -->
+                        <AuthorizeView Roles="Admin,HRM" Context="payrollContext">
+                            <Authorized>
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="payroll/calculate" @onclick="CloseNavMenu">
+                                        <i class="bi bi-calculator-fill me-1"></i> Tính lương
+                                    </NavLink>
+                                </li>
+                            </Authorized>
+                        </AuthorizeView>
+
+                        <li class="nav-item">
+                            <NavLink class="nav-link" href="payroll/my-payslip" @onclick="CloseNavMenu">
+                                <i class="bi bi-cash-coin me-1"></i> Phiếu lương
+                            </NavLink>
+                        </li>
+                    </ul>
+
+                    <!-- Góc phải: Profile Card rút gọn & Nút Đăng xuất -->
+                    <div class="d-flex align-items-center flex-column flex-lg-row">
+                        <div class="profile-chip gap-2 align-items-center">
+                            <div class="profile-icon">
+                                <i class="bi bi-person-fill"></i>
+                            </div>
+                            <span class="profile-name">@authContext.User.Identity?.Name</span>
+                            <span class="profile-role-badge">
+                                @string.Join(", ", authContext.User.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value))
+                            </span>
+                        </div>
+
+                        <span class="divider-vertical"></span>
+
+                        <a class="btn-logout-nav" href="auth/logout">
+                            <i class="bi bi-box-arrow-right me-1"></i> Đăng xuất
+                        </a>
+                    </div>
+                </Authorized>
+
+                <NotAuthorized>
+                    <!-- Góc phải hiển thị nút Đăng nhập cho người dùng ẩn danh -->
+                    <div class="d-flex ms-auto w-100 justify-content-end">
+                        <a class="btn-login-nav" href="login" @onclick="CloseNavMenu">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Đăng nhập
+                        </a>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
     </div>
-</div>
+</nav>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+@code {
+    private bool _isNavCollapsed = true;
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
+    private void ToggleNavMenu()
+    {
+        _isNavCollapsed = !_isNavCollapsed;
+    }
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-    </nav>
-</div>
-
+    private void CloseNavMenu()
+    {
+        _isNavCollapsed = true;
+    }
+}
