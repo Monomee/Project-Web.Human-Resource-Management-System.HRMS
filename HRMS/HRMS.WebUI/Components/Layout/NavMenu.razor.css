@@ -1,16 +1,16 @@
 .navbar-custom {
-    background: rgba(20, 23, 38, 0.8) !important;
+    background: rgba(20, 23, 38, 0.85) !important;
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 0.6rem 2rem !important;
-    transition: all 0.3s ease;
+    padding: 0.6rem 1.5rem !important;
+    height: 60px;
 }
 
 .navbar-brand-custom {
-    font-size: 1.35rem;
+    font-size: 1.25rem;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     background: linear-gradient(135deg, #0d6efd, #00f2fe);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -19,56 +19,26 @@
     align-items: center;
 }
 
-.navbar-brand-custom i {
-    background: linear-gradient(135deg, #0d6efd, #00f2fe);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.nav-link {
-    color: #94a3b8 !important;
-    font-size: 0.9rem;
-    font-weight: 500;
-    padding: 0.5rem 1rem !important;
-    border-radius: 10px;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    display: inline-flex;
-    align-items: center;
-    border: 1px solid transparent;
-}
-
-.nav-link:hover {
-    color: #ffffff !important;
-    background: rgba(255, 255, 255, 0.04);
-}
-
-.nav-link.active {
-    color: #ffffff !important;
-    background: rgba(13, 110, 253, 0.1) !important;
-    border-color: rgba(13, 110, 253, 0.25);
-    box-shadow: inset 0 0 10px rgba(13, 110, 253, 0.1);
-}
-
 .profile-chip {
     display: flex;
     align-items: center;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-    padding: 0.4rem 1rem;
+    padding: 0.35rem 0.75rem;
     margin-right: 0.75rem;
 }
 
 .profile-icon {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     background: rgba(13, 110, 253, 0.15);
     color: #0d6efd;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
 }
 
 .profile-name {
@@ -87,8 +57,8 @@
     background: rgba(13, 110, 253, 0.1);
     color: #3b82f6;
     border: 1px solid rgba(59, 130, 246, 0.2);
-    padding: 2px 6px;
-    border-radius: 6px;
+    padding: 1px 5px;
+    border-radius: 5px;
     text-transform: uppercase;
 }
 
@@ -96,7 +66,7 @@
     color: #fca5a5 !important;
     font-size: 0.85rem;
     font-weight: 600;
-    padding: 0.45rem 1rem !important;
+    padding: 0.4rem 0.85rem !important;
     border-radius: 10px;
     transition: all 0.2s ease;
     border: 1px solid rgba(239, 68, 68, 0.2);
@@ -117,7 +87,7 @@
     color: #ffffff !important;
     font-size: 0.85rem;
     font-weight: 600;
-    padding: 0.5rem 1.25rem !important;
+    padding: 0.45rem 1.1rem !important;
     border-radius: 10px;
     transition: all 0.2s ease;
     text-decoration: none;
@@ -133,39 +103,8 @@
 
 .divider-vertical {
     width: 1px;
-    height: 24px;
+    height: 20px;
     background: rgba(255, 255, 255, 0.1);
     margin: 0 0.75rem;
     align-self: center;
-}
-
-@media (max-width: 991.98px) {
-    .navbar-collapse {
-        background: rgba(20, 23, 38, 0.95);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 14px;
-        padding: 1.5rem;
-        margin-top: 1rem;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-    }
-    
-    .profile-chip {
-        margin-bottom: 1rem;
-        margin-right: 0;
-        width: 100%;
-        justify-content: center;
-    }
-    
-    .divider-vertical {
-        display: none;
-    }
-    
-    .btn-logout-nav, .btn-login-nav {
-        width: 100%;
-        justify-content: center;
-    }
-    
-    .nav-item {
-        margin-bottom: 0.5rem;
-    }
 }
