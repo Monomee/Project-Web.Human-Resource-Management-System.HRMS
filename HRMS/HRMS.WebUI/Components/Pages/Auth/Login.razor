@@ -1,0 +1,396 @@
+@page "/login"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using HRMS.Application.Interfaces
+@using HRMS.WebUI.Services
+@inject IAuthService AuthService
+@inject TempTokenStore TokenStore
+@inject NavigationManager NavigationManager
+
+<PageTitle>Đăng nhập - Hệ thống HRMS</PageTitle>
+
+<div class="login-container">
+    <div class="background-decor">
+        <div class="circle circle-1"></div>
+        <div class="circle circle-2"></div>
+    </div>
+
+    <div class="login-card">
+        <div class="card-header text-center">
+            <div class="logo-box">
+                <span class="bi bi-shield-lock-fill text-primary"></span>
+            </div>
+            <h2>HRMS PORTAL</h2>
+            <p class="subtitle text-muted">Hệ Thống Quản Trị Nhân Sự Doanh Nghiệp</p>
+        </div>
+
+        <EditForm Model="@_loginInput" OnValidSubmit="HandleLoginSubmit" FormName="LoginForm">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert alert-danger-custom d-flex align-items-center mb-4 show-animation">
+                    <span class="bi bi-exclamation-octagon-fill me-2 fs-5"></span>
+                    <div>@_errorMessage</div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(_urlError))
+            {
+                <div class="alert alert-warning-custom d-flex align-items-center mb-4 show-animation">
+                    <span class="bi bi-info-circle-fill me-2 fs-5"></span>
+                    <div>@_urlError</div>
+                </div>
+            }
+
+            <div class="form-group mb-4">
+                <label for="username" class="form-label">Tên tài khoản</label>
+                <div class="input-wrapper">
+                    <span class="bi bi-person-fill input-icon"></span>
+                    <InputText id="username" class="form-control-custom" placeholder="Nhập tên đăng nhập" @bind-Value="_loginInput.Username" disabled="@_isLoading" />
+                </div>
+                <ValidationMessage For="@(() => _loginInput.Username)" class="error-text mt-1 d-block" />
+            </div>
+
+            <div class="form-group mb-4">
+                <label for="password" class="form-label">Mật khẩu</label>
+                <div class="input-wrapper">
+                    <span class="bi bi-key-fill input-icon"></span>
+                    <InputText id="password" type="password" class="form-control-custom" placeholder="Nhập mật khẩu" @bind-Value="_loginInput.Password" disabled="@_isLoading" />
+                </div>
+                <ValidationMessage For="@(() => _loginInput.Password)" class="error-text mt-1 d-block" />
+            </div>
+
+            <button type="submit" class="btn-login" disabled="@_isLoading">
+                @if (_isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Đang kiểm tra...</span>
+                }
+                else
+                {
+                    <span>Đăng nhập</span>
+                }
+            </button>
+        </EditForm>
+        
+        <div class="card-footer mt-4 text-center">
+            <p class="footer-text text-muted small">© 2026 HRMS. All rights reserved.</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+    .login-container {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        min-height: calc(100vh - 70px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        padding: 20px;
+        width: 100%;
+    }
+
+    /* Background Circles for visual depth */
+    .background-decor {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    .circle {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.15;
+    }
+
+    .circle-1 {
+        width: 400px;
+        height: 400px;
+        background: linear-gradient(135deg, #0d6efd, #00f2fe);
+        top: -100px;
+        left: -100px;
+        animation: float-slow 20s infinite alternate;
+    }
+
+    .circle-2 {
+        width: 350px;
+        height: 350px;
+        background: linear-gradient(135deg, #7000ff, #f20089);
+        bottom: -50px;
+        right: -50px;
+        animation: float-slow 15s infinite alternate-reverse;
+    }
+
+    @@keyframes float-slow {
+        0% { transform: translateY(0px) rotate(0deg); }
+        100% { transform: translateY(40px) rotate(360deg); }
+    }
+
+    /* Glassmorphic Login Card */
+    .login-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 24px;
+        padding: 45px;
+        width: 100%;
+        max-width: 460px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+        z-index: 2;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .login-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.45);
+    }
+
+    .logo-box {
+        width: 65px;
+        height: 65px;
+        background: rgba(13, 110, 253, 0.1);
+        border: 1.5px solid rgba(13, 110, 253, 0.3);
+        border-radius: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        font-size: 28px;
+        color: #0d6efd;
+        box-shadow: 0 0 15px rgba(13, 110, 253, 0.2);
+    }
+
+    .login-card h2 {
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 24px;
+        letter-spacing: 1.5px;
+        margin-bottom: 5px;
+    }
+
+    .subtitle {
+        font-size: 13px;
+        margin-bottom: 30px;
+        letter-spacing: 0.5px;
+        color: #a0aec0 !important;
+    }
+
+    .form-label {
+        font-weight: 500;
+        font-size: 14px;
+        color: #e2e8f0;
+        margin-bottom: 8px;
+    }
+
+    /* Custom Input design */
+    .input-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .input-icon {
+        position: absolute;
+        left: 16px;
+        color: #718096;
+        font-size: 16px;
+        transition: color 0.3s ease;
+        z-index: 10;
+    }
+
+    .form-control-custom {
+        width: 100%;
+        height: 52px;
+        padding-left: 48px;
+        padding-right: 20px;
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1.5px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        color: #ffffff !important;
+        font-size: 14px;
+        font-weight: 400;
+        outline: none;
+        transition: all 0.3s ease;
+    }
+
+    .form-control-custom:focus {
+        border-color: #0d6efd;
+        background: rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 0 12px rgba(13, 110, 253, 0.25);
+    }
+
+    .form-control-custom:focus + .input-icon {
+        color: #0d6efd;
+    }
+
+    .form-control-custom::placeholder {
+        color: #718096;
+    }
+
+    /* Action Button */
+    .btn-login {
+        width: 100%;
+        height: 52px;
+        background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+        border: none;
+        border-radius: 14px;
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 15px;
+        box-shadow: 0 8px 16px rgba(13, 110, 253, 0.2);
+    }
+
+    .btn-login:hover {
+        background: linear-gradient(135deg, #0b5ed7, #0a58ca);
+        box-shadow: 0 10px 20px rgba(13, 110, 253, 0.35);
+        transform: translateY(-2px);
+    }
+
+    .btn-login:active {
+        transform: translateY(0);
+    }
+
+    .btn-login:disabled {
+        background: rgba(255, 255, 255, 0.1);
+        color: #718096;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+    }
+
+    /* Visual Validation Message */
+    .error-text {
+        font-size: 12px;
+        color: #fc8181;
+        font-weight: 500;
+    }
+
+    /* Custom Alert Boxes */
+    .alert-danger-custom {
+        background: rgba(254, 178, 178, 0.1);
+        border: 1px solid rgba(252, 129, 129, 0.3);
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: #feb2b2;
+        font-size: 13.5px;
+        font-weight: 500;
+    }
+
+    .alert-warning-custom {
+        background: rgba(250, 204, 21, 0.1);
+        border: 1px solid rgba(250, 204, 21, 0.3);
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: #fef08a;
+        font-size: 13.5px;
+        font-weight: 500;
+    }
+
+    .show-animation {
+        animation: slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @@keyframes slide-in {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .footer-text {
+        color: #718096 !important;
+    }
+</style>
+
+@code {
+    private readonly LoginModel _loginInput = new();
+    private string? _errorMessage;
+    private string? _urlError;
+    private bool _isLoading;
+
+    protected override void OnInitialized()
+    {
+        // Nhận lỗi từ Query String (nếu có) khi chuyển hướng từ Endpoint phụ trợ
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("error", out var errorMsg))
+        {
+            _urlError = errorMsg.ToString();
+        }
+    }
+
+    private async Task HandleLoginSubmit()
+    {
+        _errorMessage = null;
+        _urlError = null;
+        _isLoading = true;
+
+        try
+        {
+            // Kiểm tra thông tin tài khoản qua dịch vụ AuthService
+            var authResult = await AuthService.LoginAsync(_loginInput.Username, _loginInput.Password);
+
+            if (!authResult.Success)
+            {
+                _errorMessage = authResult.ErrorMessage ?? "Đăng nhập thất bại.";
+                _isLoading = false;
+                return;
+            }
+
+            // Tạo danh sách Claims từ kết quả đăng nhập thành công
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, authResult.AccountId.ToString()),
+                new Claim(ClaimTypes.Name, authResult.FullName)
+            };
+
+            // Nạp toàn bộ Roles vào Claims
+            foreach (var role in authResult.Roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var principal = new ClaimsPrincipal(identity);
+
+            // Sinh Token tạm thời và đẩy Claims vào Store
+            var tempToken = TokenStore.GenerateToken(principal);
+
+            // Redirect force load đến Endpoint ghi Cookie để thiết lập Cookie Session
+            NavigationManager.NavigateTo($"/auth/signin?token={tempToken}", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Có lỗi xảy ra trong quá trình xử lý: " + ex.Message;
+            _isLoading = false;
+        }
+    }
+
+    public class LoginModel
+    {
+        [Required(ErrorMessage = "Tên tài khoản không được để trống.")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Mật khẩu không được để trống.")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

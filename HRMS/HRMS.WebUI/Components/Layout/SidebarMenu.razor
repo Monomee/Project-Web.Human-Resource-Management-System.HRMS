@@ -1,0 +1,106 @@
+@using System.Security.Claims
+
+<div class="sidebar-menu-wrapper">
+    <nav class="nav flex-column">
+        
+        <!-- GROUP 1: OVERVIEW (TỔNG QUAN) - Mọi nhân sự -->
+        <div class="menu-section-header text-uppercase text-muted fw-bold">
+            Tổng quan
+        </div>
+        <div class="nav-item-vertical">
+            <NavLink class="nav-link-vertical" href="" Match="NavLinkMatch.All">
+                <div class="icon-frame">
+                    <i class="bi bi-grid-1x2-fill icon-vertical"></i>
+                </div>
+                <span class="text-vertical">Trang chủ</span>
+            </NavLink>
+        </div>
+
+        <!-- GROUP 2: INTERNAL ADMINISTRATION (QUẢN TRỊ NỘI BỘ) - Dành cho Admin, HRM, HR -->
+        <AuthorizeView Roles="Admin,HRM,HR" Context="adminCtx">
+            <Authorized>
+                <div class="sidebar-divider"></div>
+                <div class="menu-section-header text-uppercase text-muted fw-bold">
+                    Quản trị nội bộ
+                </div>
+
+                <!-- Quản lý Nhân sự -->
+                <div class="nav-item-vertical">
+                    <NavLink class="nav-link-vertical" href="employees">
+                        <div class="icon-frame">
+                            <i class="bi bi-people-fill icon-vertical"></i>
+                        </div>
+                        <span class="text-vertical">Quản lý Nhân sự</span>
+                    </NavLink>
+                </div>
+
+                <!-- Chấm công -->
+                <div class="nav-item-vertical">
+                    <NavLink class="nav-link-vertical" href="attendance/import">
+                        <div class="icon-frame">
+                            <i class="bi bi-calendar2-check-fill icon-vertical"></i>
+                        </div>
+                        <span class="text-vertical">Chấm công</span>
+                    </NavLink>
+                </div>
+
+                <!-- Phê duyệt đơn từ -->
+                <div class="nav-item-vertical">
+                    <NavLink class="nav-link-vertical" href="requests/approvals">
+                        <div class="icon-frame">
+                            <i class="bi bi-check-all icon-vertical fs-5"></i>
+                        </div>
+                        <span class="text-vertical">Phê duyệt Đơn</span>
+                    </NavLink>
+                </div>
+
+                <!-- Tính toán lương - Chỉ dành cho Admin, HRM -->
+                <AuthorizeView Roles="Admin,HRM" Context="payrollCtx">
+                    <Authorized>
+                        <div class="nav-item-vertical">
+                            <NavLink class="nav-link-vertical" href="payroll/calculate">
+                                <div class="icon-frame">
+                                    <i class="bi bi-calculator-fill icon-vertical"></i>
+                                </div>
+                                <span class="text-vertical">Tính toán Lương</span>
+                            </NavLink>
+                        </div>
+                    </Authorized>
+                </AuthorizeView>
+            </Authorized>
+        </AuthorizeView>
+
+        <div class="sidebar-divider"></div>
+
+        <!-- GROUP 3: PERSONAL PAGE (TRANG CÁ NHÂN) - Mọi nhân sự -->
+        <div class="menu-section-header text-uppercase text-muted fw-bold">
+            Trang cá nhân
+        </div>
+
+        <!-- Gửi đơn từ -->
+        <div class="nav-item-vertical">
+            <NavLink class="nav-link-vertical" href="requests/create">
+                <div class="icon-frame">
+                    <i class="bi bi-file-earmark-plus-fill icon-vertical"></i>
+                </div>
+                <span class="text-vertical">Gửi Đơn từ</span>
+            </NavLink>
+        </div>
+
+        <!-- Phiếu lương của tôi -->
+        <div class="nav-item-vertical">
+            <NavLink class="nav-link-vertical" href="payroll/my-payslip">
+                <div class="icon-frame">
+                    <i class="bi bi-cash-coin icon-vertical"></i>
+                </div>
+                <span class="text-vertical">Phiếu lương của tôi</span>
+            </NavLink>
+        </div>
+
+    </nav>
+</div>
+
+@code {
+    [Parameter]
+    public bool IsCollapsed { get; set; }
+}

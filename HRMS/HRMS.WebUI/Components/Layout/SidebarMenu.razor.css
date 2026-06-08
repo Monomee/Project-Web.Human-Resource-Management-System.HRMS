@@ -1,0 +1,98 @@
+.sidebar-menu-wrapper {
+    padding-top: 0.75rem;
+    height: 100%;
+}
+
+.nav-item-vertical {
+    display: block;
+}
+
+/* 1. Thiết lập cho thẻ liên kết cha (.nav-link-vertical) */
+::deep .nav-link-vertical {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start;
+    height: 42px;
+    padding: 0 12px;
+    margin: 4px 8px;
+    border-radius: 0.5rem;
+    color: #e2e8f0 !important;
+    text-decoration: none !important;
+    transition: all 0.2s ease, width 0.2s ease, margin 0.2s ease;
+    border: 1px solid transparent;
+    box-sizing: border-box;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+::deep .nav-link-vertical:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #fff !important;
+}
+
+::deep .nav-link-vertical.active {
+    background-color: #0d6efd !important;
+    color: #fff !important;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.25);
+}
+
+/* 2. Thiết lập cho khung bọc Icon (.icon-frame) */
+::deep .icon-frame {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+::deep .icon-vertical {
+    font-size: 1.15rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 3. Thiết lập cho thẻ chứa Text (.text-vertical) */
+::deep .text-vertical {
+    display: flex;
+    align-items: center;
+    line-height: 1;
+    margin: 0;
+    padding-left: 10px;
+    font-size: 0.85rem;
+    white-space: nowrap !important; /* Buộc chữ luôn nằm trên một dòng */
+    overflow: hidden !important; /* Cắt bỏ hoàn toàn phần chữ thừa tràn ra */
+    text-overflow: clip;
+    opacity: 1;
+    max-width: 150px;
+    transition: opacity 0.2s ease, max-width 0.2s ease, padding-left 0.2s ease;
+}
+
+/* Định dạng tiêu đề phân mục */
+.menu-section-header {
+    margin-top: 0 !important; /* Loại bỏ hoàn toàn khoảng cách thừa phía trên */
+    padding-top: 0 !important; /* Loại bỏ padding đỉnh */
+    margin-bottom: 5px;
+    padding-left: 15px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: bold;
+    color: #94a3b8;
+    opacity: 0.45;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: opacity 0.2s ease;
+    height: 16px; /* Giữ cố định chiều cao */
+}
+
+/* Định dạng đường kẻ phân tách cố định */
+.sidebar-divider {
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.15); /* Đường kẻ mờ sang trọng */
+    margin: 0.75rem 0.5rem;
+    border: none;
+}
