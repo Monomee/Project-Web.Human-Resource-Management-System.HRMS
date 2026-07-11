@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using HRMS.Infrastructure.Persistence;
+using HRMS.Application.Interfaces;
+using HRMS.Infrastructure.Services;
 
 namespace HRMS.Infrastructure
 {
@@ -16,6 +18,9 @@ namespace HRMS.Infrastructure
             // Đọc chuỗi kết nối "MyCnn" từ appsettings.json của WebUI và nạp vào DbContext
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(configuration.GetConnectionString("MyCnn")));
+
+            // Đăng ký dịch vụ xác thực AuthService
+            services.AddScoped<IAuthService, AuthService>();
 
             return services;
         }

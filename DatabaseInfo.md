@@ -494,7 +494,7 @@ VALUES ('NV001', N'Nguyễn Văn An', 'an.nguyen@company.com', '0912345678', 1, 
 
 INSERT INTO Accounts (Username, PasswordHash, Status, UserId)
 
-VALUES ('an.nguyen', '$2a$11$EvX7J1lWJbO8vRE11xQvO.7Mv.M3pI/tS.XG6B6Z3Z2mGx6eX8X2W', 1, @@IDENTITY); -- Mật khẩu mẫu: 'Password123'
+VALUES ('an.nguyen', '$2a$11$dvhu.R6ZlciiNhIPMlYP.uaOoUYyDIMWAl7oyHkQwDVmpsiZbEbTu', 1, @@IDENTITY); -- Mật khẩu mẫu: 'Password123'
 
 DECLARE @Id_Acc_An INT = @@IDENTITY;
 
@@ -512,7 +512,7 @@ VALUES ('NV002', N'Trần Thị Bình', 'binh.tran@company.com', '0987654321', 0
 
 INSERT INTO Accounts (Username, PasswordHash, Status, UserId)
 
-VALUES ('binh.tran', '$2a$11$EvX7J1lWJbO8vRE11xQvO.7Mv.M3pI/tS.XG6B6Z3Z2mGx6eX8X2W', 1, @@IDENTITY);
+VALUES ('binh.tran', '$2a$11$dvhu.R6ZlciiNhIPMlYP.uaOoUYyDIMWAl7oyHkQwDVmpsiZbEbTu', 1, @@IDENTITY);
 
 DECLARE @Id_Acc_Binh INT = @@IDENTITY;
 
@@ -530,7 +530,7 @@ VALUES ('NV003', N'Lê Hoàng Long', 'long.le@company.com', '0901234567', 1, '19
 
 INSERT INTO Accounts (Username, PasswordHash, Status, UserId)
 
-VALUES ('long.le', '$2a$11$EvX7J1lWJbO8vRE11xQvO.7Mv.M3pI/tS.XG6B6Z3Z2mGx6eX8X2W', 1, @@IDENTITY);
+VALUES ('long.le', '$2a$11$dvhu.R6ZlciiNhIPMlYP.uaOoUYyDIMWAl7oyHkQwDVmpsiZbEbTu', 1, @@IDENTITY);
 
 DECLARE @Id_Acc_Long INT = @@IDENTITY;
 
@@ -548,7 +548,7 @@ VALUES ('NV004', N'Phạm Minh Tuấn', 'tuan.pham@company.com', '0934567890', 1
 
 INSERT INTO Accounts (Username, PasswordHash, Status, UserId)
 
-VALUES ('tuan.pham', '$2a$11$EvX7J1lWJbO8vRE11xQvO.7Mv.M3pI/tS.XG6B6Z3Z2mGx6eX8X2W', 1, @@IDENTITY);
+VALUES ('tuan.pham', '$2a$11$dvhu.R6ZlciiNhIPMlYP.uaOoUYyDIMWAl7oyHkQwDVmpsiZbEbTu', 1, @@IDENTITY);
 
 DECLARE @Id_Acc_Tuan INT = @@IDENTITY;
 
