@@ -1,0 +1,526 @@
+@page "/attendance/import"
+@rendermode InteractiveServer
+
+@* ─────────────────────────────────────────────────────────────────────
+   ImportAttendance.razor — Trang Import Excel Chấm công
+   
+   Chức năng:
+     1. HR chọn file Excel (.xlsx) từ máy tính → Blazor gửi lên Server qua SignalR
+     2. Server xử lý: parse Excel → tính ngày công → lưu DB → trả kết quả
+     3. Hiển thị bảng kết quả trực quan (màu sắc theo trạng thái)
+     4. Nút "Khóa kỳ công" để đóng kỳ chấm công (IsLocked = true)
+   
+   Yêu cầu: @rendermode InteractiveServer để <InputFile> và real-time hoạt động.
+───────────────────────────────────────────────────────────────────────── *@
+
+@using HRMS.Application.Interfaces
+@using HRMS.Application.DTOs.Attendance
+@inject IAttendanceService AttendanceService
+@inject IJSRuntime JS
+
+<PageTitle>Import Chấm công — HRMS</PageTitle>
+
+<div class="import-page">
+
+    @* ── TIÊU ĐỀ TRANG ── *@
+    <div class="page-header">
+        <div class="page-header-icon">📊</div>
+        <div>
+            <h1 class="page-title">Import Chấm công từ Excel</h1>
+            <p class="page-subtitle">Tải lên file Excel từ máy quẹt thẻ để xử lý và tính ngày công tự động.</p>
+        </div>
+    </div>
+
+    @* ── PANEL ĐIỀU KHIỂN ── *@
+    <div class="control-panel">
+
+        @* Chọn kỳ công *@
+        <div class="form-group">
+            <label class="form-label" for="periodSelect">📅 Kỳ công</label>
+            @if (_periods.Any())
+            {
+                <select id="periodSelect" class="form-select" @bind="_selectedPeriodId">
+                    <option value="0">-- Chọn kỳ công --</option>
+                    @foreach (var p in _periods)
+                    {
+                        <option value="@p.Id" disabled="@p.IsLocked">
+                            @p.Name (@p.StartDate.ToString("dd/MM") – @p.EndDate.ToString("dd/MM/yyyy"))
+                            @(p.IsLocked ? " 🔒 Đã khóa" : "")
+                        </option>
+                    }
+                </select>
+            }
+            else
+            {
+                <p class="text-muted">Đang tải danh sách kỳ công...</p>
+            }
+        </div>
+
+        @* Chọn file Excel *@
+        <div class="form-group">
+            <label class="form-label">📁 File Excel (.xlsx)</label>
+            <div class="file-drop-zone @(_fileName != null ? "has-file" : "")">
+                <InputFile id="fileInput" OnChange="OnFileSelected" accept=".xlsx" class="file-input" />
+                <label for="fileInput" class="file-drop-label">
+                    @if (_fileName != null)
+                    {
+                        <span class="file-icon">✅</span>
+                        <span>@_fileName</span>
+                    }
+                    else
+                    {
+                        <span class="file-icon">📂</span>
+                        <span>Nhấn để chọn file hoặc kéo thả vào đây</span>
+                    }
+                </label>
+            </div>
+        </div>
+
+        @* Các nút hành động *@
+        <div class="action-buttons">
+            <button class="btn btn-primary" @onclick="ProcessFile"
+                    disabled="@(_isProcessing || _selectedFile == null || _selectedPeriodId == 0)">
+                @if (_isProcessing)
+                {
+                    <span class="spinner"></span>
+                    <span>Đang xử lý...</span>
+                }
+                else
+                {
+                    <span>⚡ Xử lý File</span>
+                }
+            </button>
+
+            <button class="btn btn-danger" @onclick="LockPeriod"
+                    disabled="@(_isLocking || _selectedPeriodId == 0 || IsSelectedPeriodLocked)">
+                @if (_isLocking)
+                {
+                    <span class="spinner"></span>
+                    <span>Đang khóa...</span>
+                }
+                else
+                {
+                    <span>🔒 Khóa kỳ công</span>
+                }
+            </button>
+        </div>
+
+        @* Thông báo lỗi/thành công *@
+        @if (_errorMessage != null)
+        {
+            <div class="alert alert-error">⚠️ @_errorMessage</div>
+        }
+        @if (_successMessage != null)
+        {
+            <div class="alert alert-success">✅ @_successMessage</div>
+        }
+    </div>
+
+    @* ── BẢNG KẾT QUẢ ── *@
+    @if (_results.Any())
+    {
+        <div class="results-section">
+            <div class="results-header">
+                <h2 class="results-title">Kết quả xử lý</h2>
+                <div class="results-stats">
+                    <span class="stat stat-total">Tổng: @_results.Count dòng</span>
+                    <span class="stat stat-ok">✅ Thành công: @_results.Count(r => !r.HasError)</span>
+                    <span class="stat stat-error">❌ Lỗi: @_results.Count(r => r.HasError)</span>
+                    <span class="stat stat-late">⏰ Đi muộn: @_results.Count(r => r.LateMinutes > 0)</span>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="result-table">
+                    <thead>
+                        <tr>
+                            <th>Mã NV</th>
+                            <th>Họ tên</th>
+                            <th>Ngày</th>
+                            <th>Giờ vào</th>
+                            <th>Giờ ra</th>
+                            <th>Đi muộn</th>
+                            <th>Ngày công</th>
+                            <th>Ghi chú</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _results.OrderBy(r => r.WorkDate).ThenBy(r => r.EmployeeCode))
+                        {
+                            <tr class="@GetRowClass(row)">
+                                <td class="code-cell">@row.EmployeeCode</td>
+                                <td>@row.EmployeeName</td>
+                                <td>@row.WorkDate.ToString("dd/MM/yyyy")</td>
+                                <td class="time-cell">@(row.CheckIn?.ToString("HH:mm") ?? "—")</td>
+                                <td class="time-cell">@(row.CheckOut?.ToString("HH:mm") ?? "—")</td>
+                                <td class="late-cell">
+                                    @if (row.LateMinutes > 0)
+                                    {
+                                        <span class="badge badge-late">@row.LateMinutes phút</span>
+                                    }
+                                    else if (!row.HasError)
+                                    {
+                                        <span class="badge badge-ok">Đúng giờ</span>
+                                    }
+                                </td>
+                                <td class="workvalue-cell">
+                                    @if (!row.HasError)
+                                    {
+                                        <span class="badge @GetWorkValueClass(row.WorkValue)">@row.WorkValue.ToString("0.0")</span>
+                                    }
+                                </td>
+                                <td class="note-cell">@row.Note</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+</div>
+
+@* ── STYLE ─────────────────────────────────────────────────────────── *@
+<style>
+    .import-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    /* Header */
+    .page-header {
+        display: flex;
+        align-items: center;
+        gap: 1.2rem;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid #e8ecf0;
+    }
+    .page-header-icon { font-size: 2.5rem; }
+    .page-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #1a2332;
+        margin: 0 0 0.25rem 0;
+    }
+    .page-subtitle { color: #6b7a8d; margin: 0; font-size: 0.95rem; }
+
+    /* Control panel */
+    .control-panel {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.75rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-label {
+        display: block;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    .form-select {
+        width: 100%;
+        max-width: 480px;
+        padding: 0.6rem 0.9rem;
+        border: 1.5px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        color: #374151;
+        background: #f9fafb;
+        transition: border-color 0.2s;
+    }
+    .form-select:focus {
+        outline: none;
+        border-color: #4f7ef7;
+        background: #fff;
+    }
+
+    /* File drop zone */
+    .file-drop-zone {
+        position: relative;
+        border: 2px dashed #c9d3e0;
+        border-radius: 10px;
+        max-width: 480px;
+        transition: border-color 0.2s, background 0.2s;
+        background: #f8fafc;
+    }
+    .file-drop-zone.has-file {
+        border-color: #22c55e;
+        background: #f0fdf4;
+    }
+    .file-input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+    }
+    .file-drop-label {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
+        cursor: pointer;
+        color: #6b7280;
+        font-size: 0.92rem;
+    }
+    .file-icon { font-size: 1.4rem; }
+
+    /* Buttons */
+    .action-buttons { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.5rem; }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.65rem 1.4rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s, transform 0.15s;
+    }
+    .btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .btn-primary { background: #4f7ef7; color: #fff; }
+    .btn-danger  { background: #ef4444; color: #fff; }
+
+    /* Spinner */
+    .spinner {
+        width: 16px; height: 16px;
+        border: 2px solid rgba(255,255,255,0.4);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        display: inline-block;
+    }
+    @@keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Alerts */
+    .alert {
+        margin-top: 1rem;
+        padding: 0.8rem 1.1rem;
+        border-radius: 8px;
+        font-size: 0.92rem;
+        font-weight: 500;
+    }
+    .alert-error   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .alert-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+
+    /* Results section */
+    .results-section { margin-top: 1.5rem; }
+    .results-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    .results-title { font-size: 1.25rem; font-weight: 700; color: #1a2332; margin: 0; }
+    .results-stats { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .stat {
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+    .stat-total { background: #e5e7eb; color: #374151; }
+    .stat-ok    { background: #dcfce7; color: #15803d; }
+    .stat-error { background: #fee2e2; color: #b91c1c; }
+    .stat-late  { background: #fef9c3; color: #92400e; }
+
+    /* Table */
+    .table-wrapper {
+        overflow-x: auto;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .result-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+    }
+    .result-table thead th {
+        background: #f1f5f9;
+        color: #475569;
+        font-weight: 700;
+        padding: 0.75rem 1rem;
+        text-align: left;
+        border-bottom: 2px solid #e2e8f0;
+        white-space: nowrap;
+    }
+    .result-table tbody tr { transition: background 0.15s; }
+    .result-table tbody tr:hover { background: #f8fafc; }
+    .result-table td {
+        padding: 0.65rem 1rem;
+        border-bottom: 1px solid #f1f5f9;
+        color: #374151;
+        vertical-align: middle;
+    }
+
+    /* Row trạng thái */
+    .row-error  { background: #fff5f5 !important; }
+    .row-late   { background: #fffbeb !important; }
+    .row-half   { background: #fff7ed !important; }
+    .row-ok     { background: #f0fdf4 !important; }
+
+    /* Badges */
+    .badge {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+    .badge-late       { background: #fef9c3; color: #92400e; }
+    .badge-ok         { background: #dcfce7; color: #15803d; }
+    .badge-work-full  { background: #dcfce7; color: #15803d; }
+    .badge-work-half  { background: #fed7aa; color: #9a3412; }
+    .badge-work-zero  { background: #fee2e2; color: #b91c1c; }
+
+    .code-cell     { font-family: monospace; font-weight: 600; }
+    .time-cell     { font-family: monospace; }
+    .workvalue-cell{ text-align: center; }
+    .note-cell     { color: #6b7280; font-size: 0.82rem; max-width: 260px; }
+
+    .text-muted { color: #9ca3af; font-size: 0.9rem; }
+</style>
+
+@* ── CODE-BEHIND (C#) ─────────────────────────────────────────────── *@
+@code {
+    // ── STATE ──────────────────────────────────────────────────────
+    private List<TimesheetPeriodDto>         _periods         = new();
+    private int                              _selectedPeriodId = 0;
+    private IBrowserFile?                    _selectedFile    = null;
+    private string?                          _fileName        = null;
+    private List<AttendanceImportResultDto>  _results         = new();
+    private bool                             _isProcessing    = false;
+    private bool                             _isLocking       = false;
+    private string?                          _errorMessage    = null;
+    private string?                          _successMessage  = null;
+
+    // Computed: kỳ công đang chọn đã bị khóa chưa?
+    private bool IsSelectedPeriodLocked =>
+        _periods.FirstOrDefault(p => p.Id == _selectedPeriodId)?.IsLocked ?? false;
+
+    // ── KHỞI TẠO: tải danh sách kỳ công ───────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        _periods = await AttendanceService.GetPeriodsAsync();
+    }
+
+    // ── SỰ KIỆN: HR chọn file ──────────────────────────────────────
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile    = e.File;
+        _fileName        = e.File.Name;
+        _errorMessage    = null;
+        _successMessage  = null;
+        _results         = new();
+    }
+
+    // ── XỬ LÝ FILE: parse → tính công → lưu DB ────────────────────
+    private async Task ProcessFile()
+    {
+        // Reset trạng thái
+        _errorMessage   = null;
+        _successMessage = null;
+        _results        = new();
+
+        // Kiểm tra đầu vào
+        if (_selectedFile == null)  { _errorMessage = "Vui lòng chọn file Excel."; return; }
+        if (_selectedPeriodId == 0) { _errorMessage = "Vui lòng chọn kỳ công.";    return; }
+
+        _isProcessing = true;
+        StateHasChanged(); // Cập nhật UI ngay để hiện spinner
+
+        try
+        {
+            // Giới hạn kích thước file: 10 MB
+            const long MAX_FILE_SIZE = 10 * 1024 * 1024;
+            await using var stream = _selectedFile.OpenReadStream(maxAllowedSize: MAX_FILE_SIZE);
+
+            // Gọi service xử lý
+            _results = await AttendanceService.ImportAndSaveAsync(stream, _selectedPeriodId);
+
+            int successCount = _results.Count(r => !r.HasError);
+            int errorCount   = _results.Count(r =>  r.HasError);
+            _successMessage  = $"Xử lý hoàn tất: {successCount} dòng thành công" +
+                               (errorCount > 0 ? $", {errorCount} dòng lỗi (xem bảng bên dưới)." : ".");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Lỗi khi xử lý file: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    // ── KHÓA KỲ CÔNG ───────────────────────────────────────────────
+    private async Task LockPeriod()
+    {
+        if (_selectedPeriodId == 0) return;
+
+        var period = _periods.FirstOrDefault(p => p.Id == _selectedPeriodId);
+        if (period == null) return;
+
+        // Xác nhận trước khi khóa (hành động không thể hoàn tác)
+        bool confirmed = await JS.InvokeAsync<bool>("confirm",
+            $"⚠️ Bạn có chắc muốn KHÓA kỳ công '{period.Name}'?\n\n" +
+            "Sau khi khóa, sẽ không thể import thêm dữ liệu vào kỳ này.\n" +
+            "Thao tác này KHÔNG THỂ hoàn tác!");
+
+        if (!confirmed) return;
+
+        _isLocking      = true;
+        _errorMessage   = null;
+        _successMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            await AttendanceService.LockPeriodAsync(_selectedPeriodId);
+
+            // Cập nhật lại danh sách kỳ công để phản ánh trạng thái mới
+            _periods = await AttendanceService.GetPeriodsAsync();
+            _successMessage = $"✅ Kỳ công '{period.Name}' đã được khóa thành công.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Lỗi khi khóa kỳ công: {ex.Message}";
+        }
+        finally
+        {
+            _isLocking = false;
+        }
+    }
+
+    // ── HELPER: xác định CSS class cho từng dòng kết quả ──────────
+    private static string GetRowClass(AttendanceImportResultDto row)
+    {
+        if (row.HasError)        return "row-error";
+        if (row.WorkValue == 0)  return "row-error";
+        if (row.WorkValue < 1.0) return "row-half";
+        if (row.LateMinutes > 0) return "row-late";
+        return "row-ok";
+    }
+
+    // ── HELPER: CSS class cho badge giá trị ngày công ─────────────
+    private static string GetWorkValueClass(double workValue) => workValue switch
+    {
+        1.0 => "badge badge-work-full",
+        0.5 => "badge badge-work-half",
+        _   => "badge badge-work-zero"
+    };
+}
