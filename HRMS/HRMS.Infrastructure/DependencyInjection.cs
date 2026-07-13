@@ -22,6 +22,9 @@ namespace HRMS.Infrastructure
             // Đăng ký dịch vụ xác thực AuthService
             services.AddScoped<IAuthService, AuthService>();
 
+            // Đăng ký dịch vụ quản lý nhân viên EmployeeService
+            services.AddScoped<IEmployeeService, EmployeeService>();
+
             return services;
         }
     }

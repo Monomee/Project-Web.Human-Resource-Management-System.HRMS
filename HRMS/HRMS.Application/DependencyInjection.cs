@@ -9,8 +9,7 @@ namespace HRMS.Application
     {
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
-            // Hiện tại thư mục Features chưa có Service nào nên tạm thời để trống ở đây.
-            // Sau này khi viết EmployeeService, AttendanceService... sẽ thêm vào dưới này.
+            // Services sẽ được đăng ký tại Infrastructure layer vì chúng phụ thuộc vào DbContext
 
             return services;
         }
