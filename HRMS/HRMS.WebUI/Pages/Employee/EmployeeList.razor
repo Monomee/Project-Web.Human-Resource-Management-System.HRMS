@@ -1,0 +1,844 @@
+@page "/employees"
+@rendermode InteractiveServer
+@using HRMS.Application.Interfaces
+@using HRMS.Application.DTOs
+@using HRMS.Domain.Exceptions
+@inject IEmployeeService EmployeeService
+@inject NavigationManager Navigation
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,HRM,HR")]
+
+<PageTitle>Danh sách Nhân viên</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="page-title">
+                <i class="bi bi-people-fill me-2"></i>Quản lý Nhân sự
+            </h2>
+            <p class="page-subtitle">Quản lý thông tin và trạng thái làm việc của nhân viên</p>
+        </div>
+    </div>
+
+    @if (employees == null)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+            <p class="mt-3 text-muted-light">Đang tải dữ liệu...</p>
+        </div>
+    }
+    else if (!employees.Any())
+    {
+        <div class="alert alert-info-dark">
+            <i class="bi bi-info-circle me-2"></i>Chưa có nhân viên nào trong hệ thống.
+        </div>
+    }
+    else
+    {
+        <!-- Table Toolbar -->
+        <div class="table-toolbar mb-3">
+            <div class="toolbar-left">
+                <div class="search-box">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="text" 
+                           class="form-control search-input" 
+                           placeholder="Tìm kiếm nhân viên (Tên, Mã NV, Email)" 
+                           @bind="searchKeyword"
+                           @bind:event="oninput"
+                           @onkeyup="ApplyFilters" />
+                    @if (!string.IsNullOrEmpty(searchKeyword))
+                    {
+                        <button class="btn-clear-search" @onclick="ClearSearch">
+                            <i class="bi bi-x-circle-fill"></i>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <div class="toolbar-middle">
+                <div class="filter-item">
+                    <i class="bi bi-building filter-icon"></i>
+                    <select class="form-select filter-select" @onchange="OnDepartmentFilterChanged">
+                        <option value="">Tất cả phòng ban</option>
+                        @foreach (var dept in GetUniqueDepartments())
+                        {
+                            <option value="@dept">@dept</option>
+                        }
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <i class="bi bi-check-circle filter-icon"></i>
+                    <select class="form-select filter-select" @onchange="OnStatusFilterChanged">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="true">Đang làm</option>
+                        <option value="false">Đã nghỉ</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="toolbar-right">
+                <button class="btn-add-new" @onclick="AddNewEmployee">
+                    <i class="bi bi-plus-circle me-2"></i>Thêm nhân viên mới
+                </button>
+            </div>
+        </div>
+
+        <div class="card-dark">
+            <div class="table-responsive">
+                <table class="table-dark-custom">
+                    <thead>
+                        <tr>
+                            <th style="width: 280px">Nhân viên</th>
+                            <th style="width: 250px">Email</th>
+                            <th style="width: 100px" class="text-center">Giới tính</th>
+                            <th style="width: 180px">Phòng ban</th>
+                            <th style="width: 180px">Chức vụ</th>
+                            <th style="width: 130px" class="text-center">Trạng thái</th>
+                            <th style="width: 120px" class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var emp in GetFilteredEmployees())
+                        {
+                            <tr>
+                                <td>
+                                    <div class="employee-info-cell">
+                                        <div class="employee-avatar">
+                                            @GetInitials(emp.FullName)
+                                        </div>
+                                        <div class="employee-details">
+                                            <div class="employee-name-primary">@emp.FullName</div>
+                                            <div class="employee-code-secondary">@emp.EmployeeCode</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="employee-email">@emp.EmailCompany</span></td>
+                                <td class="text-center">
+                                    @if (emp.Gender.HasValue)
+                                    {
+                                        <span class="badge-dark @(emp.Gender.Value ? "badge-male" : "badge-female")">
+                                            <i class="bi @(emp.Gender.Value ? "bi-gender-male" : "bi-gender-female") me-1"></i>
+                                            @(emp.Gender.Value ? "Nam" : "Nữ")
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted-light">N/A</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge-dark badge-department">
+                                        <i class="bi bi-building me-1"></i>@emp.DepartmentName
+                                    </span>
+                                </td>
+                                <td><span class="position-text">@emp.PositionName</span></td>
+                                <td class="text-center">
+                                    @if (emp.Status)
+                                    {
+                                        <span class="badge-dark badge-active">
+                                            <i class="bi bi-check-circle-fill me-1"></i>Đang làm
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-dark badge-inactive">
+                                            <i class="bi bi-dash-circle-fill me-1"></i>Đã nghỉ
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    <div class="action-icons">
+                                        <button class="icon-btn icon-view" 
+                                                @onclick="() => ViewDetail(emp.Id)"
+                                                title="Xem chi tiết">
+                                            <i class="bi bi-eye-fill"></i>
+                                        </button>
+                                        <button class="icon-btn icon-edit" 
+                                                @onclick="() => EditEmployee(emp.Id)"
+                                                title="Chỉnh sửa">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        <button class="icon-btn icon-pause" 
+                                                @onclick="() => ToggleStatus(emp)" 
+                                                disabled="@(isProcessing && processingUserId == emp.Id)"
+                                                title="@(emp.Status ? "Tạm dừng" : "Kích hoạt")">
+                                            @if (isProcessing && processingUserId == emp.Id)
+                                            {
+                                                <span class="spinner-border spinner-border-sm"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-pause-circle-fill"></i>
+                                            }
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert @alertClass mt-3">
+                <i class="bi @(alertClass == "alert-success-dark" ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i>
+                @message
+            </div>
+        }
+    }
+</div>
+
+<!-- Modal hiển thị lỗi Business Rule -->
+@if (showBusinessErrorModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content-dark">
+                <div class="modal-header-dark bg-danger">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Vi phạm Quy tắc Nghiệp vụ
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body-dark">
+                    <p class="mb-0">@businessErrorMessage</p>
+                </div>
+                <div class="modal-footer-dark">
+                    <button type="button" class="btn btn-secondary-dark" @onclick="CloseModal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<EmployeeDto>? employees;
+    private string searchKeyword = string.Empty;
+    private string selectedDepartment = string.Empty;
+    private string selectedStatus = string.Empty;
+    
+    private bool isProcessing = false;
+    private int? processingUserId = null;
+    private string message = string.Empty;
+    private string alertClass = string.Empty;
+    private bool showBusinessErrorModal = false;
+    private string businessErrorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployees();
+    }
+
+    private async Task LoadEmployees()
+    {
+        employees = await EmployeeService.GetEmployeesWithDetailsAsync();
+    }
+
+    private IEnumerable<EmployeeDto> GetFilteredEmployees()
+    {
+        if (employees == null) return Enumerable.Empty<EmployeeDto>();
+
+        var filtered = employees.AsEnumerable();
+
+        // Search filter
+        if (!string.IsNullOrWhiteSpace(searchKeyword))
+        {
+            var keyword = searchKeyword.ToLower();
+            filtered = filtered.Where(e => 
+                e.FullName.ToLower().Contains(keyword) ||
+                e.EmployeeCode.ToLower().Contains(keyword) ||
+                e.EmailCompany.ToLower().Contains(keyword)
+            );
+        }
+
+        // Department filter
+        if (!string.IsNullOrWhiteSpace(selectedDepartment))
+        {
+            filtered = filtered.Where(e => e.DepartmentName == selectedDepartment);
+        }
+
+        // Status filter
+        if (!string.IsNullOrWhiteSpace(selectedStatus))
+        {
+            bool status = selectedStatus == "true";
+            filtered = filtered.Where(e => e.Status == status);
+        }
+
+        return filtered;
+    }
+
+    private IEnumerable<string> GetUniqueDepartments()
+    {
+        if (employees == null) return Enumerable.Empty<string>();
+        return employees.Select(e => e.DepartmentName).Distinct().OrderBy(d => d);
+    }
+
+    private void ApplyFilters()
+    {
+        StateHasChanged();
+    }
+
+    private void ClearSearch()
+    {
+        searchKeyword = string.Empty;
+        StateHasChanged();
+    }
+
+    private void OnDepartmentFilterChanged(ChangeEventArgs e)
+    {
+        selectedDepartment = e.Value?.ToString() ?? string.Empty;
+        StateHasChanged();
+    }
+
+    private void OnStatusFilterChanged(ChangeEventArgs e)
+    {
+        selectedStatus = e.Value?.ToString() ?? string.Empty;
+        StateHasChanged();
+    }
+
+    private void AddNewEmployee()
+    {
+        // TODO: Navigate to add new employee page
+        message = "Chức năng thêm nhân viên đang được phát triển.";
+        alertClass = "alert-info-dark";
+    }
+
+    private string GetInitials(string fullName)
+    {
+        if (string.IsNullOrWhiteSpace(fullName)) return "?";
+        
+        var words = fullName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length == 1) return words[0].Substring(0, Math.Min(2, words[0].Length)).ToUpper();
+        
+        // Lấy chữ cái đầu của tên cuối và tên đệm/tên đầu
+        return (words[words.Length - 1].Substring(0, 1) + words[0].Substring(0, 1)).ToUpper();
+    }
+
+    private void ViewDetail(int employeeId)
+    {
+        Navigation.NavigateTo($"/employees/detail/{employeeId}");
+    }
+
+    private void EditEmployee(int employeeId)
+    {
+        // TODO: Navigate to edit page
+        message = "Chức năng chỉnh sửa đang được phát triển.";
+        alertClass = "alert-info-dark";
+    }
+
+    private async Task ToggleStatus(EmployeeDto employee)
+    {
+        isProcessing = true;
+        processingUserId = employee.Id;
+        message = string.Empty;
+
+        try
+        {
+            bool newStatus = !employee.Status;
+            bool success = await EmployeeService.UpdateEmployeeStatusAsync(employee.Id, newStatus);
+
+            if (success)
+            {
+                employee.Status = newStatus;
+                message = $"Đã cập nhật trạng thái nhân viên {employee.FullName} thành công.";
+                alertClass = "alert-success-dark";
+            }
+            else
+            {
+                message = "Không tìm thấy nhân viên để cập nhật.";
+                alertClass = "alert-danger-dark";
+            }
+        }
+        catch (BusinessException ex)
+        {
+            businessErrorMessage = ex.Message;
+            showBusinessErrorModal = true;
+        }
+        catch (Exception ex)
+        {
+            message = $"Lỗi hệ thống: {ex.Message}";
+            alertClass = "alert-danger-dark";
+        }
+        finally
+        {
+            isProcessing = false;
+            processingUserId = null;
+        }
+    }
+
+    private void CloseModal()
+    {
+        showBusinessErrorModal = false;
+        businessErrorMessage = string.Empty;
+    }
+}
+
+<style>
+    /* ============================================
+       DARK THEME FOR EMPLOYEE MANAGEMENT
+       ============================================ */
+    
+    /* Page Title */
+    .page-title {
+        color: #f1f5f9;
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .page-subtitle {
+        color: #94a3b8;
+        font-size: 0.95rem;
+        margin-bottom: 0;
+    }
+
+    /* ============================================
+       TABLE TOOLBAR
+       ============================================ */
+    .table-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.5rem;
+        padding: 1.25rem 1.5rem;
+        background: rgba(20, 23, 38, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px 12px 0 0;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+    }
+
+    .toolbar-left {
+        flex: 1;
+        max-width: 400px;
+    }
+
+    .toolbar-middle {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .toolbar-right {
+        flex-shrink: 0;
+    }
+
+    /* Search Box */
+    .search-box {
+        position: relative;
+        width: 100%;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        font-size: 1rem;
+        z-index: 1;
+    }
+
+    .search-input {
+        width: 100%;
+        height: 42px;
+        padding-left: 2.75rem;
+        padding-right: 2.5rem;
+        background: rgba(30, 41, 59, 0.6) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: #e2e8f0 !important;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+        background: rgba(30, 41, 59, 0.8) !important;
+        border-color: rgba(59, 130, 246, 0.5);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        outline: none;
+    }
+
+    .search-input::placeholder {
+        color: #64748b;
+    }
+
+    .btn-clear-search {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 0.25rem;
+        display: flex;
+        align-items: center;
+        transition: color 0.2s ease;
+    }
+
+    .btn-clear-search:hover {
+        color: #ef4444;
+    }
+
+    /* Filter Items */
+    .filter-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .filter-icon {
+        color: #94a3b8;
+        font-size: 1rem;
+    }
+
+    .filter-select {
+        min-width: 180px;
+        height: 42px;
+        padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+        background: rgba(30, 41, 59, 0.6) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: #e2e8f0 !important;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 16px 12px;
+        appearance: none;
+    }
+
+    .filter-select:focus {
+        background-color: rgba(30, 41, 59, 0.8) !important;
+        border-color: rgba(59, 130, 246, 0.5);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        outline: none;
+    }
+
+    .filter-select option {
+        background: #1e293b;
+        color: #e2e8f0;
+    }
+
+    /* Add New Button */
+    .btn-add-new {
+        height: 42px;
+        padding: 0 1.5rem;
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        font-size: 0.9rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+    }
+
+    .btn-add-new:hover {
+        background: linear-gradient(135deg, #16a34a, #15803d);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(34, 197, 94, 0.3);
+    }
+
+    .btn-add-new:active {
+        transform: translateY(0);
+    }
+
+    /* Card Dark */
+    .card-dark {
+        background: rgba(20, 23, 38, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 0 0 12px 12px;
+        border-top: none;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 0;
+        overflow: hidden;
+    }
+
+    /* Table Dark Custom */
+    .table-dark-custom {
+        width: 100%;
+        margin-bottom: 0;
+        color: #e2e8f0;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .table-dark-custom thead {
+        background: rgba(30, 41, 59, 0.8);
+        border-bottom: 2px solid rgba(100, 116, 139, 0.3);
+    }
+
+    .table-dark-custom thead th {
+        padding: 1rem 1.25rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #cbd5e1;
+        border: none;
+    }
+
+    .table-dark-custom tbody tr {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        transition: background-color 0.2s ease;
+    }
+
+    .table-dark-custom tbody tr:hover {
+        background: rgba(51, 65, 85, 0.4);
+    }
+
+    .table-dark-custom tbody td {
+        padding: 1rem 1.25rem;
+        vertical-align: middle;
+        border: none;
+    }
+
+    /* Employee Info Styles */
+    .employee-info-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.875rem;
+    }
+
+    .employee-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.875rem;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .employee-details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        min-width: 0;
+    }
+
+    .employee-name-primary {
+        color: #f1f5f9;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .employee-code-secondary {
+        color: #64748b;
+        font-size: 0.8125rem;
+        line-height: 1;
+        font-weight: 400;
+    }
+
+    .employee-email {
+        color: #94a3b8;
+        font-size: 0.9rem;
+    }
+
+    .position-text {
+        color: #cbd5e1;
+        font-size: 0.9rem;
+    }
+
+    /* Badge Dark Styles */
+    .badge-dark {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.825rem;
+        font-weight: 500;
+        border: 1px solid transparent;
+    }
+
+    .badge-male {
+        background: rgba(59, 130, 246, 0.15);
+        color: #93c5fd;
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .badge-female {
+        background: rgba(236, 72, 153, 0.15);
+        color: #f9a8d4;
+        border-color: rgba(236, 72, 153, 0.3);
+    }
+
+    .badge-department {
+        background: rgba(6, 182, 212, 0.15);
+        color: #67e8f9;
+        border-color: rgba(6, 182, 212, 0.3);
+    }
+
+    .badge-active {
+        background: rgba(34, 197, 94, 0.15);
+        color: #86efac;
+        border-color: rgba(34, 197, 94, 0.3);
+    }
+
+    .badge-inactive {
+        background: rgba(100, 116, 139, 0.15);
+        color: #cbd5e1;
+        border-color: rgba(100, 116, 139, 0.3);
+    }
+
+    /* Action Icons (Compact & Elegant) */
+    .action-icons {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .icon-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        border: none;
+        background: rgba(30, 41, 59, 0.5);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        font-size: 1rem;
+        padding: 0;
+    }
+
+    .icon-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .icon-btn:active {
+        transform: translateY(-1px);
+    }
+
+    .icon-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    /* Icon View - Blue */
+    .icon-view {
+        color: #60a5fa;
+    }
+
+    .icon-view:hover {
+        background: rgba(59, 130, 246, 0.15);
+        color: #93c5fd;
+        box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Icon Edit - Gray */
+    .icon-edit {
+        color: #94a3b8;
+    }
+
+    .icon-edit:hover {
+        background: rgba(100, 116, 139, 0.15);
+        color: #cbd5e1;
+        box-shadow: 0 8px 16px rgba(100, 116, 139, 0.3);
+    }
+
+    /* Icon Pause - Amber/Yellow */
+    .icon-pause {
+        color: #fbbf24;
+    }
+
+    .icon-pause:hover {
+        background: rgba(251, 191, 36, 0.15);
+        color: #fcd34d;
+        box-shadow: 0 8px 16px rgba(251, 191, 36, 0.3);
+    }
+
+    /* Alerts Dark */
+    .alert {
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        border: 1px solid;
+    }
+
+    .alert-success-dark {
+        background: rgba(34, 197, 94, 0.1);
+        border-color: rgba(34, 197, 94, 0.3);
+        color: #86efac;
+    }
+
+    .alert-danger-dark {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+    }
+
+    .alert-info-dark {
+        background: rgba(59, 130, 246, 0.1);
+        border-color: rgba(59, 130, 246, 0.3);
+        color: #93c5fd;
+    }
+
+    /* Modal Dark */
+    .modal-content-dark {
+        background: rgba(15, 23, 42, 0.98);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        backdrop-filter: blur(20px);
+        color: #e2e8f0;
+    }
+
+    .modal-header-dark {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 1.25rem 1.5rem;
+    }
+
+    .modal-body-dark {
+        padding: 1.5rem;
+        color: #cbd5e1;
+    }
+
+    .modal-footer-dark {
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 1rem 1.5rem;
+    }
+
+    .btn-secondary-dark {
+        background: rgba(100, 116, 139, 0.3);
+        border: 1px solid rgba(100, 116, 139, 0.5);
+        color: #e2e8f0;
+        padding: 0.5rem 1.25rem;
+        border-radius: 6px;
+    }
+
+    .btn-secondary-dark:hover {
+        background: rgba(100, 116, 139, 0.5);
+        border-color: rgba(100, 116, 139, 0.7);
+    }
+
+    /* Text Utilities */
+    .text-muted-light {
+        color: #94a3b8 !important;
+    }
+</style>

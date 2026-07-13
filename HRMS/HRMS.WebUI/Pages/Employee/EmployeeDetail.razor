@@ -1,0 +1,502 @@
+@page "/employees/detail/{id:int}"
+@rendermode InteractiveServer
+@using HRMS.Application.Interfaces
+@using HRMS.Application.DTOs
+@using HRMS.Domain.Exceptions
+@inject IEmployeeService EmployeeService
+@inject NavigationManager Navigation
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,HRM,HR")]
+
+<PageTitle>Chi tiết Nhân viên</PageTitle>
+
+<div class="container-fluid mt-4">
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="/employees" style="text-decoration: none;">
+                    <i class="bi bi-people-fill"></i> Danh sách Nhân viên
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">Chi tiết</li>
+        </ol>
+    </nav>
+
+    @if (employee == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row mb-3">
+            <div class="col">
+                <h2 class="text-primary">
+                    <i class="bi bi-person-badge-fill"></i> Chi tiết Nhân viên: @employee.FullName
+                </h2>
+            </div>
+        </div>
+
+        <!-- PHẦN 1: HỒ SƠ CÁ NHÂN -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-circle"></i> Thông tin Cá nhân
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="40%">Mã nhân viên:</th>
+                                <td><span class="badge bg-dark">@employee.EmployeeCode</span></td>
+                            </tr>
+                            <tr>
+                                <th>Họ và tên:</th>
+                                <td><strong>@employee.FullName</strong></td>
+                            </tr>
+                            <tr>
+                                <th>Giới tính:</th>
+                                <td>
+                                    @if (employee.Gender.HasValue)
+                                    {
+                                        <span class="badge @(employee.Gender.Value ? "bg-primary" : "bg-pink")">
+                                            <i class="bi @(employee.Gender.Value ? "bi-gender-male" : "bi-gender-female")"></i>
+                                            @(employee.Gender.Value ? "Nam" : "Nữ")
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Chưa cập nhật</span>
+                                    }
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Ngày sinh:</th>
+                                <td>
+                                    @if (employee.DateOfBirth.HasValue)
+                                    {
+                                        @employee.DateOfBirth.Value.ToString("dd/MM/yyyy")
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Chưa cập nhật</span>
+                                    }
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="40%">Email:</th>
+                                <td>
+                                    <a href="mailto:@employee.EmailCompany">@employee.EmailCompany</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Số điện thoại:</th>
+                                <td>@(employee.Phone ?? "Chưa cập nhật")</td>
+                            </tr>
+                            <tr>
+                                <th>Phòng ban:</th>
+                                <td>
+                                    <span class="badge bg-info text-dark">
+                                        @employee.DepartmentCode - @employee.DepartmentName
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Chức vụ:</th>
+                                <td>
+                                    <span class="badge bg-secondary">
+                                        @employee.PositionCode - @employee.PositionName
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Trạng thái làm việc:</th>
+                                <td>
+                                    @if (employee.Status)
+                                    {
+                                        <span class="badge bg-success fs-6">
+                                            <i class="bi bi-check-circle-fill"></i> ĐANG LÀM VIỆC
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary fs-6">
+                                            <i class="bi bi-x-circle-fill"></i> ĐÃ NGHỈ VIỆC
+                                        </span>
+                                    }
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHẦN 2: DANH SÁCH HỢP ĐỒNG -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-file-earmark-text-fill"></i> Lịch sử Hợp đồng Lao động
+                    <span class="badge bg-light text-dark ms-2">@employee.Contracts.Count hợp đồng</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                @if (!employee.Contracts.Any())
+                {
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> Nhân viên này chưa có hợp đồng nào.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-success">
+                                <tr>
+                                    <th>Số hợp đồng</th>
+                                    <th>Loại hợp đồng</th>
+                                    <th>Ngày bắt đầu</th>
+                                    <th>Ngày kết thúc</th>
+                                    <th class="text-end">Lương cơ bản</th>
+                                    <th class="text-center">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var contract in employee.Contracts)
+                                {
+                                    <tr class="@(contract.IsActive ? "table-success" : "")">
+                                        <td>
+                                            <strong>@contract.ContractNo</strong>
+                                            @if (contract.IsActive)
+                                            {
+                                                <span class="badge bg-success ms-1">
+                                                    <i class="bi bi-star-fill"></i> Hiện tại
+                                                </span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="badge @(contract.ContractType == "Official" ? "bg-primary" : "bg-warning text-dark")">
+                                                @contract.ContractType
+                                            </span>
+                                        </td>
+                                        <td>@contract.StartDate.ToString("dd/MM/yyyy")</td>
+                                        <td>
+                                            @if (contract.EndDate.HasValue)
+                                            {
+                                                @contract.EndDate.Value.ToString("dd/MM/yyyy")
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">Không xác định</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            <strong class="text-success">
+                                                @contract.BaseSalary.ToString("N0") VNĐ
+                                            </strong>
+                                        </td>
+                                        <td class="text-center">
+                                            @if (contract.IsActive)
+                                            {
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle-fill"></i> Đang hoạt động
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">
+                                                    <i class="bi bi-x-circle"></i> Đã kết thúc
+                                                </span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Thống kê tóm tắt -->
+                    <div class="row mt-3">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted">Tổng số hợp đồng</h6>
+                                    <h3 class="text-primary">@employee.Contracts.Count</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted">Hợp đồng đang hoạt động</h6>
+                                    <h3 class="text-success">@employee.Contracts.Count(c => c.IsActive)</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted">Lương hiện tại</h6>
+                                    <h3 class="text-success">
+                                        @{
+                                            var activeContract = employee.Contracts.FirstOrDefault(c => c.IsActive);
+                                            if (activeContract != null)
+                                            {
+                                                @activeContract.BaseSalary.ToString("N0")
+                                                <small>VNĐ</small>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">N/A</span>
+                                            }
+                                        }
+                                    </h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Nút Quay lại -->
+        <div class="mt-4">
+            <button class="btn btn-secondary" @onclick="GoBack">
+                <i class="bi bi-arrow-left"></i> Quay lại Danh sách
+            </button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill"></i> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private EmployeeDetailDto? employee;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeeDetail();
+    }
+
+    private async Task LoadEmployeeDetail()
+    {
+        try
+        {
+            employee = await EmployeeService.GetEmployeeDetailByIdAsync(Id);
+        }
+        catch (BusinessException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi hệ thống: {ex.Message}";
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/employees");
+    }
+}
+
+<style>
+    /* Dark theme glassmorphism style to match HRMS */
+    .card {
+        background: rgba(20, 23, 38, 0.55) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+    }
+
+    .card-header {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .table {
+        color: #e2e8f0;
+    }
+
+    .table-borderless th {
+        color: #94a3b8;
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+
+    .table-borderless td {
+        color: #e2e8f0;
+        padding: 0.5rem 0.75rem;
+    }
+
+    .table-success {
+        background: rgba(34, 197, 94, 0.15) !important;
+        color: #86efac !important;
+        border-color: rgba(34, 197, 94, 0.2) !important;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(34, 197, 94, 0.05);
+        transition: background-color 0.2s ease;
+    }
+
+    .table-success tbody tr.table-success {
+        background-color: rgba(34, 197, 94, 0.08) !important;
+        border-left: 3px solid #22c55e;
+    }
+
+    .bg-pink {
+        background: linear-gradient(135deg, #ec4899, #be185d) !important;
+        color: white;
+        border: none;
+    }
+
+    .badge {
+        padding: 0.4em 0.75em;
+        font-weight: 500;
+        border-radius: 0.375rem;
+    }
+
+    .badge.bg-info {
+        background: linear-gradient(135deg, #06b6d4, #0891b2) !important;
+        color: white !important;
+    }
+
+    .badge.bg-secondary {
+        background: rgba(100, 116, 139, 0.9) !important;
+    }
+
+    .badge.bg-dark {
+        background: rgba(30, 41, 59, 0.9) !important;
+    }
+
+    .badge.bg-success {
+        background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+    }
+
+    .badge.bg-primary {
+        background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    }
+
+    .badge.bg-warning {
+        background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    }
+
+    .badge.bg-light {
+        background: rgba(241, 245, 249, 0.15) !important;
+        color: #e2e8f0 !important;
+    }
+
+    .alert {
+        background: rgba(20, 23, 38, 0.7) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(10px);
+        color: #e2e8f0;
+    }
+
+    .alert-warning {
+        border-color: rgba(245, 158, 11, 0.3) !important;
+        background: rgba(245, 158, 11, 0.1) !important;
+        color: #fcd34d !important;
+    }
+
+    .breadcrumb {
+        background: rgba(20, 23, 38, 0.4);
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .breadcrumb-item {
+        color: #94a3b8;
+    }
+
+    .breadcrumb-item.active {
+        color: #e2e8f0;
+    }
+
+    .breadcrumb-item a {
+        color: #60a5fa;
+        text-decoration: none;
+        transition: color 0.2s;
+    }
+
+    .breadcrumb-item a:hover {
+        color: #93c5fd;
+    }
+
+    .text-primary {
+        color: #93c5fd !important;
+    }
+
+    .text-success {
+        color: #86efac !important;
+    }
+
+    .text-muted {
+        color: #94a3b8 !important;
+    }
+
+    h2 {
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    h5 {
+        font-weight: 600;
+    }
+
+    .card.bg-light {
+        background: rgba(30, 41, 59, 0.5) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .card.bg-light .card-body {
+        padding: 1.25rem;
+    }
+
+    .card.bg-light h6 {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+    }
+
+    .card.bg-light h3 {
+        font-weight: 700;
+        margin-bottom: 0;
+    }
+
+    strong {
+        font-weight: 600;
+    }
+
+    .btn-secondary {
+        background: rgba(100, 116, 139, 0.3);
+        border: 1px solid rgba(100, 116, 139, 0.5);
+        color: #e2e8f0;
+    }
+
+    .btn-secondary:hover {
+        background: rgba(100, 116, 139, 0.5);
+        border-color: rgba(100, 116, 139, 0.7);
+        color: #f1f5f9;
+    }
+</style>
