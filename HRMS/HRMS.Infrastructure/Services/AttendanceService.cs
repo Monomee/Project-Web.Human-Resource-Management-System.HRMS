@@ -80,6 +80,17 @@ public class AttendanceService : IAttendanceService
         if (!rawRows.Any())
             return new List<AttendanceImportResultDto>();
 
+        // ── BƯỚC 1.5: KIỂM TRA PHẠM VI NGÀY CỦA DỮ LIỆU CÓ PHÙ HỢP KỲ CÔNG KHÔNG ─────────
+        foreach (var row in rawRows)
+        {
+            var checkedDate = DateOnly.FromDateTime(row.CheckedAt);
+            if (checkedDate < period.StartDate || checkedDate > period.EndDate)
+            {
+                throw new InvalidOperationException(
+                    $"Dữ liệu quẹt thẻ ngày {checkedDate:dd/MM/yyyy} (của nhân viên {row.EmployeeCode}) không nằm trong kỳ công đang chọn '{period.Name}' ({period.StartDate:dd/MM/yyyy} - {period.EndDate:dd/MM/yyyy}).");
+            }
+        }
+
         // ── BƯỚC 2: TẢI DỮ LIỆU NHÂN VIÊN TỪ DB ────────────────────
         // Lấy tất cả mã nhân viên xuất hiện trong file Excel
         var employeeCodes = rawRows.Select(r => r.EmployeeCode).Distinct().ToList();
