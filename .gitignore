@@ -83,3 +83,5 @@ nunit-*.xml
 Thumbs.db
 Desktop.ini
 .DS_Store
+HRMS/HRMS.WebUI/appsettings.json
+HRMS/HRMS.WebUI/appsettings.Development.json
