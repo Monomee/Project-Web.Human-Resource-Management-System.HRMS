@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using HRMS.Application.DTOs.Attendance;
 using HRMS.Application.Interfaces;
@@ -80,6 +83,18 @@ public class AttendanceService : IAttendanceService
         if (!rawRows.Any())
             return new List<AttendanceImportResultDto>();
 
+        // Chuẩn hóa và loại bỏ trùng lặp trong file Excel (cùng mã NV, thời gian, loại quẹt)
+        rawRows = rawRows
+            .Select(r => new AttendanceRowDto
+            {
+                EmployeeCode = r.EmployeeCode.Trim().ToUpperInvariant(),
+                CheckedAt    = r.CheckedAt,
+                CheckType    = r.CheckType.Trim().ToUpperInvariant()
+            })
+            .GroupBy(r => new { r.EmployeeCode, r.CheckedAt, r.CheckType })
+            .Select(g => g.First())
+            .ToList();
+
         // ── BƯỚC 1.5: KIỂM TRA PHẠM VI NGÀY CỦA DỮ LIỆU CÓ PHÙ HỢP KỲ CÔNG KHÔNG ─────────
         foreach (var row in rawRows)
         {
@@ -92,13 +107,25 @@ public class AttendanceService : IAttendanceService
         }
 
         // ── BƯỚC 2: TẢI DỮ LIỆU NHÂN VIÊN TỪ DB ────────────────────
-        // Lấy tất cả mã nhân viên xuất hiện trong file Excel
+        // Lấy tất cả mã nhân viên xuất hiện trong file Excel (đã được chuẩn hóa chữ hoa)
         var employeeCodes = rawRows.Select(r => r.EmployeeCode).Distinct().ToList();
 
         // Tra cứu 1 lần từ DB → tránh query DB trong vòng lặp (N+1 problem)
+        // Dùng StringComparer.OrdinalIgnoreCase đề phòng mã nhân viên trong DB có viết hoa/thường khác nhau
         var userDict = await _db.Users
             .Where(u => employeeCodes.Contains(u.EmployeeCode))
-            .ToDictionaryAsync(u => u.EmployeeCode);
+            .ToDictionaryAsync(u => u.EmployeeCode, StringComparer.OrdinalIgnoreCase);
+
+        // Tải danh sách log chấm công hiện tại của các nhân viên này trong kỳ để đối chiếu trùng lặp DB
+        var userIds = userDict.Values.Select(u => u.Id).ToList();
+        var existingLogs = await _db.AttendanceLogs
+            .Where(log => log.PeriodId == periodId && userIds.Contains(log.UserId))
+            .Select(log => new { log.UserId, log.CheckedAt, log.CheckType })
+            .ToListAsync();
+
+        var existingLogsSet = existingLogs
+            .Select(log => (log.UserId, log.CheckedAt, CheckType: log.CheckType.Trim().ToUpperInvariant()))
+            .ToHashSet();
 
         // ── BƯỚC 3: GOM NHÓM THEO (EmployeeCode, Ngày làm việc) ──────
         //
@@ -150,6 +177,41 @@ public class AttendanceService : IAttendanceService
             var (workValue, lateMinutes, note) = CalculateAttendance(checkIn, checkOut);
             // ────────────────────────────────────────────────────────
 
+            // Kiểm tra các dòng log của ngày hôm nay có bị trùng lặp với dữ liệu đã lưu trong DB hay không
+            int duplicateDbCount = 0;
+            int totalRowsInGroup = group.Count();
+
+            // Chuẩn bị bản ghi để lưu vào DB (bỏ qua những bản ghi trùng lặp đã tồn tại trong DB)
+            foreach (var row in group)
+            {
+                var isDuplicateInDb = existingLogsSet.Contains((user.Id, row.CheckedAt, row.CheckType));
+                if (isDuplicateInDb)
+                {
+                    duplicateDbCount++;
+                }
+                else
+                {
+                    logsToInsert.Add(new AttendanceLog
+                    {
+                        UserId    = user.Id,
+                        PeriodId  = periodId,
+                        CheckedAt = row.CheckedAt,
+                        CheckType = row.CheckType,
+                        Source    = "Excel"         // Đánh dấu nguồn gốc dữ liệu
+                    });
+                }
+            }
+
+            // Gắn nhãn ghi chú cho người dùng biết trạng thái trùng lặp DB
+            if (duplicateDbCount == totalRowsInGroup)
+            {
+                note += " (Bản ghi đã tồn tại trong DB)";
+            }
+            else if (duplicateDbCount > 0)
+            {
+                note += $" (Trùng lặp DB {duplicateDbCount}/{totalRowsInGroup} dòng, đã cập nhật các dòng mới)";
+            }
+
             results.Add(new AttendanceImportResultDto
             {
                 EmployeeCode = employeeCode,
@@ -162,19 +224,6 @@ public class AttendanceService : IAttendanceService
                 Note         = note,
                 HasError     = false
             });
-
-            // Chuẩn bị bản ghi để lưu vào DB (mỗi dòng Excel gốc = 1 AttendanceLog)
-            foreach (var row in group)
-            {
-                logsToInsert.Add(new AttendanceLog
-                {
-                    UserId    = user.Id,
-                    PeriodId  = periodId,
-                    CheckedAt = row.CheckedAt,
-                    CheckType = row.CheckType,
-                    Source    = "Excel"         // Đánh dấu nguồn gốc dữ liệu
-                });
-            }
         }
 
         // ── BƯỚC 5: LƯU TẤT CẢ VÀO DB TRONG 1 LẦN ─────────────────
