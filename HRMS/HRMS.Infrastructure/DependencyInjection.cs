@@ -22,6 +22,12 @@ namespace HRMS.Infrastructure
             // Đăng ký dịch vụ xác thực AuthService
             services.AddScoped<IAuthService, AuthService>();
 
+            // Đăng ký dịch vụ đọc file Excel (Task 3.3)
+            services.AddScoped<IExcelParserService, ExcelParserService>();
+
+            // Đăng ký dịch vụ nghiệp vụ chấm công (Task 3.3)
+            services.AddScoped<IAttendanceService, AttendanceService>();
+
             return services;
         }
     }
