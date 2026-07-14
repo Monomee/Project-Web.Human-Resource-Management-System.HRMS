@@ -1,0 +1,946 @@
+@page "/employees/detail/{id:int}"
+@rendermode InteractiveServer
+@using HRMS.Application.Interfaces
+@using HRMS.Application.DTOs
+@using HRMS.Domain.Exceptions
+@using HRMS.WebUI.Components.Pages.Employee
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IEmployeeService EmployeeService
+@inject IContractService ContractService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,HRM,HR")]
+
+<PageTitle>Chi tiết Nhân viên</PageTitle>
+
+<div class="container-fluid mt-4">
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="/employees" style="text-decoration: none;">
+                    <i class="bi bi-people-fill"></i> Danh sách Nhân viên
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">Chi tiết</li>
+        </ol>
+    </nav>
+
+    @if (employee == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row mb-3">
+            <div class="col">
+                <h2 class="text-primary">
+                    <i class="bi bi-person-badge-fill"></i> Chi tiết Nhân viên: @employee.FullName
+                </h2>
+            </div>
+        </div>
+
+        <!-- PHẦN 1: HỒ SƠ CÁ NHÂN -->
+        <div class="card-dark-custom shadow-sm mb-4">
+            <div class="section-header-dark">
+                <div class="section-title">
+                    <i class="bi bi-person-circle me-2"></i>
+                    <span>Thông tin Cá nhân</span>
+                </div>
+            </div>
+            <div class="card-body-dark">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="info-grid">
+                            <div class="info-row">
+                                <span class="info-label">Mã nhân viên:</span>
+                                <span class="info-value">
+                                    <span class="badge-employee-code">@employee.EmployeeCode</span>
+                                </span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Họ và tên:</span>
+                                <span class="info-value info-highlight">@employee.FullName</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Giới tính:</span>
+                                <span class="info-value">
+                                    @if (employee.Gender.HasValue)
+                                    {
+                                        <span class="badge-dark @(employee.Gender.Value ? "badge-male" : "badge-female")">
+                                            <i class="bi @(employee.Gender.Value ? "bi-gender-male" : "bi-gender-female") me-1"></i>
+                                            @(employee.Gender.Value ? "Nam" : "Nữ")
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted-dark">Chưa cập nhật</span>
+                                    }
+                                </span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Ngày sinh:</span>
+                                <span class="info-value">
+                                    @if (employee.DateOfBirth.HasValue)
+                                    {
+                                        @employee.DateOfBirth.Value.ToString("dd/MM/yyyy")
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted-dark">Chưa cập nhật</span>
+                                    }
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-grid">
+                            <div class="info-row">
+                                <span class="info-label">Email:</span>
+                                <span class="info-value">
+                                    <a href="mailto:@employee.EmailCompany" class="email-link">@employee.EmailCompany</a>
+                                </span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Số điện thoại:</span>
+                                <span class="info-value">@(employee.Phone ?? "Chưa cập nhật")</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Phòng ban:</span>
+                                <span class="info-value">
+                                    <span class="badge-dark badge-department">
+                                        <i class="bi bi-building me-1"></i>
+                                        @employee.DepartmentCode - @employee.DepartmentName
+                                    </span>
+                                </span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Chức vụ:</span>
+                                <span class="info-value">
+                                    <span class="badge-dark badge-position">
+                                        <i class="bi bi-briefcase me-1"></i>
+                                        @employee.PositionCode - @employee.PositionName
+                                    </span>
+                                </span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Trạng thái:</span>
+                                <span class="info-value">
+                                    @if (employee.Status)
+                                    {
+                                        <span class="badge-dark badge-status-active">
+                                            <i class="bi bi-check-circle-fill me-1"></i>ĐANG LÀM VIỆC
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-dark badge-status-inactive">
+                                            <i class="bi bi-x-circle-fill me-1"></i>ĐÃ NGHỈ VIỆC
+                                        </span>
+                                    }
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHẦN 2: DANH SÁCH HỢP ĐỒNG -->
+        <div class="card-dark-custom shadow-sm">
+            <div class="section-header-dark">
+                <div class="section-title">
+                    <i class="bi bi-file-earmark-text-fill me-2"></i>
+                    <span>Lịch sử Hợp đồng Lao động</span>
+                    <span class="badge-contract-count ms-2">@employee.Contracts.Count hợp đồng</span>
+                </div>
+                <!-- Authorization: HR and HRM can create contract -->
+                <AuthorizeView Roles="HR,HRM">
+                    <Authorized>
+                        <button class="btn-add-contract" @onclick="OpenCreateContractModal">
+                            <i class="bi bi-plus-circle me-2"></i>Thêm hợp đồng mới
+                        </button>
+                    </Authorized>
+                    <NotAuthorized>
+                        <button class="btn-add-contract" disabled title="Chỉ HR/HRM mới có quyền tạo hợp đồng">
+                            <i class="bi bi-lock-fill me-2"></i>Thêm hợp đồng mới
+                        </button>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+            <div class="card-body-dark">
+                @if (!employee.Contracts.Any())
+                {
+                    <div class="alert-warning-dark">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Nhân viên này chưa có hợp đồng nào.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-contract-header">
+                                <tr>
+                                    <th>Số hợp đồng</th>
+                                    <th>Loại hợp đồng</th>
+                                    <th>Ngày bắt đầu</th>
+                                    <th>Ngày kết thúc</th>
+                                    <th class="text-end">Lương cơ bản</th>
+                                    <th class="text-center">Trạng thái</th>
+                                    <th class="text-center">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var contract in employee.Contracts)
+                                {
+                                    <tr class="@(contract.IsActive ? "table-success" : "")">
+                                        <td>
+                                            <strong>@contract.ContractNo</strong>
+                                            @if (contract.IsActive)
+                                            {
+                                                <span class="badge bg-success ms-1">
+                                                    <i class="bi bi-star-fill"></i> Hiện tại
+                                                </span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="badge @(contract.ContractType == "Official" ? "bg-primary" : "bg-warning text-dark")">
+                                                @contract.ContractType
+                                            </span>
+                                        </td>
+                                        <td>@contract.StartDate.ToString("dd/MM/yyyy")</td>
+                                        <td>
+                                            @if (contract.EndDate.HasValue)
+                                            {
+                                                @contract.EndDate.Value.ToString("dd/MM/yyyy")
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">Không xác định</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            <strong class="text-success">
+                                                @contract.BaseSalary.ToString("N0") VNĐ
+                                            </strong>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge-dark @contract.StatusBadgeClass">
+                                                <i class="bi @(contract.StatusEnum == HRMS.Domain.Enums.ContractStatus.Active ? "bi-check-circle-fill" : 
+                                                             contract.StatusEnum == HRMS.Domain.Enums.ContractStatus.Pending ? "bi-clock-fill" :
+                                                             contract.StatusEnum == HRMS.Domain.Enums.ContractStatus.Rejected ? "bi-x-circle-fill" : 
+                                                             "bi-file-earmark") me-1"></i>
+                                                @contract.StatusDisplayName
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <AuthorizeView Roles="HRM">
+                                                <Authorized>
+                                                    <button class="btn-edit-contract" @onclick="() => OpenEditContractModal(contract)" title="Chỉnh sửa hợp đồng">
+                                                        <i class="bi bi-pencil-fill"></i>
+                                                    </button>
+                                                </Authorized>
+                                                <NotAuthorized>
+                                                    <span class="text-muted-dark">—</span>
+                                                </NotAuthorized>
+                                            </AuthorizeView>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Thống kê tóm tắt -->
+                    <div class="row mt-3">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted">Tổng số hợp đồng</h6>
+                                    <h3 class="text-primary">@employee.Contracts.Count</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted">Hợp đồng đang hoạt động</h6>
+                                    <h3 class="text-success">@employee.Contracts.Count(c => c.IsActive)</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted">Lương hiện tại</h6>
+                                    <h3 class="text-success">
+                                        @{
+                                            var activeContract = employee.Contracts.FirstOrDefault(c => c.IsActive);
+                                            if (activeContract != null)
+                                            {
+                                                @activeContract.BaseSalary.ToString("N0")
+                                                <small>VNĐ</small>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">N/A</span>
+                                            }
+                                        }
+                                    </h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Nút Quay lại -->
+        <div class="mt-4">
+            <button class="btn btn-secondary" @onclick="GoBack">
+                <i class="bi bi-arrow-left"></i> Quay lại Danh sách
+            </button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill"></i> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success-dark alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-check-circle-fill"></i> @successMessage
+            <button type="button" class="btn-close-success" @onclick="() => successMessage = string.Empty"></button>
+        </div>
+    }
+</div>
+
+<!-- Create Contract Modal -->
+<CreateContractModal 
+    IsOpen="@isCreateContractModalOpen"
+    UserId="@Id"
+    OnClose="@CloseCreateContractModal"
+    OnSave="@HandleContractCreated" />
+
+<!-- Edit Contract Modal -->
+<EditContractModal 
+    IsOpen="@isEditContractModalOpen"
+    ContractData="@selectedContract"
+    OnClose="@CloseEditContractModal"
+    OnSave="@HandleContractUpdated" />
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private EmployeeDetailDto? employee;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private bool isCreateContractModalOpen = false;
+    private bool isEditContractModalOpen = false;
+    private ContractDto? selectedContract = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeeDetail();
+    }
+
+    private async Task LoadEmployeeDetail()
+    {
+        try
+        {
+            employee = await EmployeeService.GetEmployeeDetailByIdAsync(Id);
+        }
+        catch (BusinessException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi hệ thống: {ex.Message}";
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/employees");
+    }
+
+    private void OpenCreateContractModal()
+    {
+        isCreateContractModalOpen = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void CloseCreateContractModal()
+    {
+        isCreateContractModalOpen = false;
+    }
+
+    private async Task HandleContractCreated(ContractDto newContract)
+    {
+        // Show success message
+        successMessage = $"Đã tạo hợp đồng {newContract.ContractNo} thành công. Trạng thái: {newContract.StatusDisplayName}";
+        
+        // Reload employee detail to refresh contract list
+        await LoadEmployeeDetail();
+        
+        // Close modal
+        isCreateContractModalOpen = false;
+    }
+
+    private void OpenEditContractModal(ContractDto contract)
+    {
+        selectedContract = contract;
+        isEditContractModalOpen = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void CloseEditContractModal()
+    {
+        isEditContractModalOpen = false;
+        selectedContract = null;
+    }
+
+    private async Task HandleContractUpdated(bool success)
+    {
+        if (success)
+        {
+            // Show success message
+            successMessage = $"Đã cập nhật hợp đồng {selectedContract?.ContractNo} thành công.";
+            
+            // Reload employee detail to refresh contract list
+            await LoadEmployeeDetail();
+        }
+        
+        // Close modal
+        isEditContractModalOpen = false;
+        selectedContract = null;
+    }
+}
+
+<style>
+    /* ============================================
+       DARK THEME FOR EMPLOYEE DETAIL PAGE
+       ============================================ */
+
+    /* Card Dark Custom */
+    .card-dark-custom {
+        background: rgba(20, 23, 38, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        overflow: hidden;
+    }
+
+    /* Section Header Dark - Thay thế banner màu đặc */
+    .section-header-dark {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.5rem 2rem;
+        background: rgba(30, 41, 59, 0.3);
+        border-bottom: 1px solid #2d2d44;
+    }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        color: #f1f5f9;
+        font-size: 1.125rem;
+        font-weight: 600;
+    }
+
+    .section-title i {
+        color: #60a5fa;
+        font-size: 1.25rem;
+    }
+
+    .badge-contract-count {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.35rem 0.75rem;
+        background: rgba(59, 130, 246, 0.15);
+        color: #93c5fd;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 6px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+    }
+
+    /* Button Thêm hợp đồng mới */
+    .btn-add-contract {
+        padding: 0.625rem 1.25rem;
+        background: transparent;
+        border: 1.5px solid rgba(34, 197, 94, 0.5);
+        border-radius: 8px;
+        color: #86efac;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s ease;
+    }
+
+    .btn-add-contract:hover {
+        background: rgba(34, 197, 94, 0.15);
+        border-color: rgba(34, 197, 94, 0.7);
+        color: #4ade80;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+    }
+
+    .btn-add-contract:active {
+        transform: translateY(0);
+    }
+
+    .btn-add-contract:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        border-color: rgba(100, 116, 139, 0.3);
+        color: #64748b;
+    }
+
+    .btn-add-contract:disabled:hover {
+        background: transparent;
+        border-color: rgba(100, 116, 139, 0.3);
+        transform: none;
+        box-shadow: none;
+    }
+
+    /* Contract Status Badges */
+    .badge-draft {
+        background: rgba(100, 116, 139, 0.15);
+        color: #cbd5e1;
+        border: 1px solid rgba(100, 116, 139, 0.3);
+    }
+
+    .badge-pending {
+        background: rgba(251, 191, 36, 0.15);
+        color: #fbbf24;
+        border: 1px solid rgba(251, 191, 36, 0.3);
+    }
+
+    .badge-active {
+        background: rgba(34, 197, 94, 0.15);
+        color: #86efac;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .badge-rejected {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    /* Alert Success Dark */
+    .alert-success-dark {
+        background: rgba(34, 197, 94, 0.1) !important;
+        border: 1px solid rgba(34, 197, 94, 0.3) !important;
+        color: #86efac !important;
+        backdrop-filter: blur(10px);
+        padding: 1rem 1.25rem;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .btn-close-success {
+        background: transparent;
+        border: none;
+        color: #86efac;
+        cursor: pointer;
+        font-size: 1.25rem;
+        padding: 0.25rem;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+    }
+
+    .btn-close-success:hover {
+        opacity: 1;
+    }
+
+    /* Button Edit Contract */
+    .btn-edit-contract {
+        padding: 0.45rem 0.75rem;
+        background: rgba(251, 191, 36, 0.15);
+        border: 1px solid rgba(251, 191, 36, 0.3);
+        color: #fcd34d;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-edit-contract:hover {
+        background: rgba(251, 191, 36, 0.25);
+        border-color: rgba(251, 191, 36, 0.5);
+        color: #fbbf24;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(251, 191, 36, 0.2);
+    }
+
+    .btn-edit-contract:active {
+        transform: translateY(0);
+    }
+
+    /* Card Body Dark */
+    .card-body-dark {
+        padding: 2rem;
+    }
+
+    /* Info Grid - Thay thế table */
+    .info-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    .info-row {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .info-label {
+        color: #94a3b8;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .info-value {
+        color: #e2e8f0;
+        font-size: 0.9375rem;
+    }
+
+    .info-highlight {
+        font-weight: 600;
+        color: #f1f5f9;
+        font-size: 1rem;
+    }
+
+    .badge-employee-code {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4rem 0.875rem;
+        background: rgba(30, 41, 59, 0.8);
+        color: #cbd5e1;
+        border: 1px solid rgba(100, 116, 139, 0.4);
+        border-radius: 6px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        font-family: 'Courier New', monospace;
+    }
+
+    /* Badge Dark Styles */
+    .badge-dark {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        border: 1px solid transparent;
+    }
+
+    .badge-male {
+        background: rgba(59, 130, 246, 0.15);
+        color: #93c5fd;
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .badge-female {
+        background: rgba(236, 72, 153, 0.15);
+        color: #f9a8d4;
+        border-color: rgba(236, 72, 153, 0.3);
+    }
+
+    .badge-department {
+        background: rgba(6, 182, 212, 0.15);
+        color: #67e8f9;
+        border-color: rgba(6, 182, 212, 0.3);
+    }
+
+    .badge-position {
+        background: rgba(100, 116, 139, 0.15);
+        color: #cbd5e1;
+        border-color: rgba(100, 116, 139, 0.3);
+    }
+
+    .badge-status-active {
+        background: rgba(34, 197, 94, 0.15);
+        color: #86efac;
+        border-color: rgba(34, 197, 94, 0.3);
+        font-size: 0.875rem;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+    }
+
+    .badge-status-inactive {
+        background: rgba(100, 116, 139, 0.15);
+        color: #cbd5e1;
+        border-color: rgba(100, 116, 139, 0.3);
+        font-size: 0.875rem;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+    }
+
+    /* Email Link */
+    .email-link {
+        color: #60a5fa;
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+
+    .email-link:hover {
+        color: #93c5fd;
+        text-decoration: underline;
+    }
+
+    /* Text Muted Dark */
+    .text-muted-dark {
+        color: #64748b !important;
+        font-style: italic;
+    }
+
+    /* Alert Warning Dark */
+    .alert-warning-dark {
+        padding: 1rem 1.25rem;
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 8px;
+        color: #fcd34d;
+        display: flex;
+        align-items: center;
+    }
+
+    /* Table Dark */
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    .table {
+        color: #e2e8f0;
+        margin-bottom: 0;
+    }
+
+    /* Table Contract Header - Màu đen cho chữ */
+    .table-contract-header {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.35) 0%, rgba(22, 163, 74, 0.35) 100%);
+        border-bottom: 2px solid rgba(34, 197, 94, 0.6);
+    }
+
+    .table-contract-header th {
+        color: #1e293b !important; /* Màu đen đậm */
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        padding: 1.1rem 1.25rem;
+        border: none;
+        text-shadow: none; /* Bỏ text shadow */
+    }
+
+    .table thead {
+        background: rgba(30, 41, 59, 0.5);
+        border-bottom: 2px solid rgba(34, 197, 94, 0.2);
+    }
+
+    .table thead th {
+        color: #cbd5e1;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 1rem 1.25rem;
+        border: none;
+    }
+
+    .table tbody tr {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        transition: background-color 0.2s ease;
+    }
+
+    .table tbody tr:hover {
+        background: rgba(51, 65, 85, 0.4);
+    }
+
+    .table tbody tr.table-success {
+        background: rgba(34, 197, 94, 0.08);
+        border-left: 3px solid #22c55e;
+    }
+
+    .table tbody td {
+        padding: 1rem 1.25rem;
+        vertical-align: middle;
+        border: none;
+    }
+
+    /* Badge Contract Type */
+    .badge {
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+    }
+
+    .bg-primary {
+        background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+        color: white;
+    }
+
+    .bg-warning {
+        background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    }
+
+    .bg-success {
+        background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+        color: white;
+    }
+
+    .bg-secondary {
+        background: rgba(100, 116, 139, 0.9) !important;
+        color: #e2e8f0;
+    }
+
+    .text-dark {
+        color: #1e293b !important;
+    }
+
+    /* Statistics Cards */
+    .card.bg-light {
+        background: rgba(30, 41, 59, 0.5) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .card.bg-light .card-body {
+        padding: 1.25rem;
+    }
+
+    .card.bg-light h6 {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+        color: #94a3b8;
+    }
+
+    .card.bg-light h3 {
+        font-weight: 700;
+        margin-bottom: 0;
+        color: #f1f5f9;
+    }
+
+    .card.bg-light h3 small {
+        font-size: 0.7rem;
+        font-weight: 400;
+    }
+
+    .text-success {
+        color: #86efac !important;
+    }
+
+    .text-muted {
+        color: #94a3b8 !important;
+    }
+
+    /* Breadcrumb */
+    .breadcrumb {
+        background: rgba(20, 23, 38, 0.4);
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .breadcrumb-item {
+        color: #94a3b8;
+    }
+
+    .breadcrumb-item.active {
+        color: #e2e8f0;
+    }
+
+    .breadcrumb-item a {
+        color: #60a5fa;
+        text-decoration: none;
+        transition: color 0.2s;
+    }
+
+    .breadcrumb-item a:hover {
+        color: #93c5fd;
+    }
+
+    /* Page Title */
+    .text-primary {
+        color: #93c5fd !important;
+    }
+
+    h2 {
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    /* Back Button */
+    .btn-secondary {
+        background: rgba(100, 116, 139, 0.3);
+        border: 1px solid rgba(100, 116, 139, 0.5);
+        color: #e2e8f0;
+        transition: all 0.2s ease;
+    }
+
+    .btn-secondary:hover {
+        background: rgba(100, 116, 139, 0.5);
+        border-color: rgba(100, 116, 139, 0.7);
+        color: #f1f5f9;
+        transform: translateY(-2px);
+    }
+
+    /* Alert Danger */
+    .alert-danger {
+        background: rgba(239, 68, 68, 0.1) !important;
+        border: 1px solid rgba(239, 68, 68, 0.3) !important;
+        color: #fca5a5 !important;
+        backdrop-filter: blur(10px);
+    }
+
+    /* Spinner */
+    .spinner-border {
+        color: #60a5fa;
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .info-row {
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+        }
+
+        .section-header-dark {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .btn-add-contract {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>

@@ -1,0 +1,511 @@
+@using HRMS.Application.DTOs
+@using HRMS.Application.Interfaces
+@using HRMS.Domain.Exceptions
+@inject IContractService ContractService
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block modal-backdrop-click" tabindex="-1" @onclick="HandleBackdropClick">
+        <div class="modal-dialog modal-dialog-centered modal-lg" @onclick:stopPropagation="true">
+            <div class="modal-content-dark">
+                <!-- Header -->
+                <div class="modal-header-dark">
+                    <h5 class="modal-title">
+                        <i class="bi bi-pencil-square text-warning me-2"></i>
+                        Chỉnh sửa hợp đồng lao động
+                    </h5>
+                </div>
+
+                <!-- Body -->
+                <div class="modal-body-dark">
+                    <EditForm Model="@model" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="row g-3">
+                            <!-- Column 1 -->
+                            <div class="col-md-6">
+                                <!-- Số hợp đồng (Read-only) -->
+                                <div class="form-group-dark">
+                                    <label class="form-label-dark">
+                                        <i class="bi bi-file-earmark-lock me-1"></i>Số hợp đồng
+                                    </label>
+                                    <div class="readonly-field">
+                                        <i class="bi bi-lock-fill me-2"></i>
+                                        <span>@ContractNo</span>
+                                    </div>
+                                    <small class="text-muted-small">Mã hợp đồng không thể thay đổi</small>
+                                </div>
+
+                                <!-- Loại hợp đồng -->
+                                <div class="form-group-dark">
+                                    <label class="form-label-dark">
+                                        <i class="bi bi-file-text me-1"></i>Loại hợp đồng <span class="text-danger">*</span>
+                                    </label>
+                                    <InputSelect class="form-control-dark" @bind-Value="model.ContractType">
+                                        <option value="">-- Chọn loại hợp đồng --</option>
+                                        @foreach (var type in contractTypes)
+                                        {
+                                            <option value="@type">@type</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="@(() => model.ContractType)" class="validation-message" />
+                                </div>
+
+                                <!-- Ngày bắt đầu -->
+                                <div class="form-group-dark">
+                                    <label class="form-label-dark">
+                                        <i class="bi bi-calendar-check me-1"></i>Ngày bắt đầu <span class="text-danger">*</span>
+                                    </label>
+                                    <InputDate class="form-control-dark" @bind-Value="startDate" />
+                                    <ValidationMessage For="@(() => model.StartDate)" class="validation-message" />
+                                </div>
+
+                                <!-- Lương cơ bản -->
+                                <div class="form-group-dark">
+                                    <label class="form-label-dark">
+                                        <i class="bi bi-currency-dollar me-1"></i>Lương cơ bản (VNĐ) <span class="text-danger">*</span>
+                                    </label>
+                                    <InputNumber class="form-control-dark" @bind-Value="model.BaseSalary" step="100000" />
+                                    <ValidationMessage For="@(() => model.BaseSalary)" class="validation-message" />
+                                </div>
+                            </div>
+
+                            <!-- Column 2 -->
+                            <div class="col-md-6">
+                                <!-- Ngày kết thúc -->
+                                <div class="form-group-dark">
+                                    <label class="form-label-dark">
+                                        <i class="bi bi-calendar-x me-1"></i>Ngày kết thúc <span class="text-danger">*</span>
+                                    </label>
+                                    <InputDate class="form-control-dark" @bind-Value="endDate" />
+                                    <ValidationMessage For="@(() => model.EndDate)" class="validation-message" />
+                                    @if (endDate < startDate)
+                                    {
+                                        <div class="text-danger small mt-1">
+                                            <i class="bi bi-exclamation-circle me-1"></i>Ngày kết thúc phải >= Ngày bắt đầu
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- Trạng thái -->
+                                <div class="form-group-dark">
+                                    <label class="form-label-dark">
+                                        <i class="bi bi-shield-check me-1"></i>Trạng thái <span class="text-danger">*</span>
+                                    </label>
+                                    <InputSelect class="form-control-dark" @bind-Value="model.Status">
+                                        <option value="Pending">Chờ duyệt</option>
+                                        <option value="Active">Hiệu lực</option>
+                                        <option value="Rejected">Từ chối</option>
+                                        <option value="Draft">Nháp</option>
+                                    </InputSelect>
+                                    <ValidationMessage For="@(() => model.Status)" class="validation-message" />
+                                </div>
+
+                                <!-- Info box -->
+                                <div class="alert alert-warning-contract">
+                                    <div class="d-flex align-items-start">
+                                        <i class="bi bi-exclamation-triangle-fill me-2 mt-1" style="font-size: 1.1rem;"></i>
+                                        <div>
+                                            <strong>Lưu ý quan trọng:</strong>
+                                            <ul class="mb-0 mt-2 ps-3">
+                                                <li>Chỉ <strong>HRM</strong> mới có quyền chỉnh sửa</li>
+                                                <li>Mã hợp đồng <strong>không thể</strong> thay đổi</li>
+                                                <li>Kiểm tra kỹ trước khi lưu thay đổi</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger-dark mt-3">
+                                <i class="bi bi-exclamation-triangle me-2"></i>@errorMessage
+                            </div>
+                        }
+                    </EditForm>
+                </div>
+
+                <!-- Footer -->
+                <div class="modal-footer-dark">
+                    <button type="button" class="btn btn-secondary-dark" @onclick="CloseModal" disabled="@isSubmitting">
+                        <i class="bi bi-x-circle me-1"></i>Đóng
+                    </button>
+                    <button type="button" class="btn btn-warning-contract" @onclick="HandleValidSubmit" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Đang lưu...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-save me-1"></i>
+                            <span>Lưu thay đổi</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public ContractDto? ContractData { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<bool> OnSave { get; set; }
+
+    private UpdateContractDto model = new();
+    private List<string> contractTypes = new();
+    private bool isSubmitting = false;
+    private string errorMessage = string.Empty;
+    private string ContractNo = string.Empty;
+
+    // Date handling for DateOnly conversion
+    private DateTime startDate = DateTime.Today;
+    private DateTime endDate = DateTime.Today.AddYears(1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadContractTypes();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && ContractData != null)
+        {
+            // Pre-fill form with existing data
+            model = new UpdateContractDto
+            {
+                Id = ContractData.Id,
+                ContractType = ContractData.ContractType,
+                StartDate = ContractData.StartDate,
+                EndDate = ContractData.EndDate ?? DateOnly.FromDateTime(DateTime.Today.AddYears(1)),
+                BaseSalary = ContractData.BaseSalary,
+                Status = ContractData.Status
+            };
+
+            ContractNo = ContractData.ContractNo;
+            startDate = ContractData.StartDate.ToDateTime(TimeOnly.MinValue);
+            endDate = ContractData.EndDate?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Today.AddYears(1);
+            errorMessage = string.Empty;
+            isSubmitting = false;
+        }
+    }
+
+    private async Task LoadContractTypes()
+    {
+        try
+        {
+            contractTypes = await ContractService.GetContractTypesAsync();
+        }
+        catch (Exception)
+        {
+            contractTypes = new List<string>
+            {
+                "Thử việc",
+                "Có thời hạn (1 năm)",
+                "Có thời hạn (2 năm)",
+                "Có thời hạn (3 năm)",
+                "Không thời hạn"
+            };
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (isSubmitting) return;
+
+        try
+        {
+            isSubmitting = true;
+            errorMessage = string.Empty;
+
+            // Convert DateTime to DateOnly
+            model.StartDate = DateOnly.FromDateTime(startDate);
+            model.EndDate = DateOnly.FromDateTime(endDate);
+
+            // Validate dates
+            if (model.EndDate < model.StartDate)
+            {
+                errorMessage = "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.";
+                return;
+            }
+
+            // Validate required fields
+            if (string.IsNullOrWhiteSpace(model.ContractType))
+            {
+                errorMessage = "Vui lòng chọn loại hợp đồng.";
+                return;
+            }
+
+            if (model.BaseSalary <= 0)
+            {
+                errorMessage = "Lương cơ bản phải lớn hơn 0.";
+                return;
+            }
+
+            // Call service to update contract
+            bool success = await ContractService.UpdateAsync(model);
+
+            if (!success)
+            {
+                errorMessage = "Không tìm thấy hợp đồng để cập nhật.";
+                return;
+            }
+
+            // Invoke callback to parent component
+            await OnSave.InvokeAsync(true);
+
+            // Close modal
+            await CloseModal();
+        }
+        catch (BusinessException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi hệ thống: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task HandleBackdropClick()
+    {
+        if (!isSubmitting)
+        {
+            await CloseModal();
+        }
+    }
+}
+
+<style>
+    /* Inherit styles from CreateContractModal */
+
+    /* Modal Backdrop - Fix z-index and pointer events */
+    .modal-backdrop-click {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 1050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-dialog {
+        position: relative;
+        z-index: 1051;
+        max-width: 900px;
+        margin: 0 auto;
+        pointer-events: auto; /* Ensure dialog can receive clicks */
+    }
+
+    .modal-content-dark {
+        background: linear-gradient(145deg, #1e1e2f 0%, #16182a 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        pointer-events: auto; /* Critical: Allow clicks inside modal */
+    }
+
+    .modal-header-dark {
+        background: rgba(20, 23, 38, 0.6);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 1.25rem 1.5rem;
+        border-radius: 12px 12px 0 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-title {
+        color: #f1f5f9;
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .modal-body-dark {
+        padding: 1.75rem 1.5rem;
+        color: #e2e8f0;
+    }
+
+    .form-group-dark {
+        margin-bottom: 1.25rem;
+    }
+
+    .form-label-dark {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #cbd5e1;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .form-control-dark {
+        width: 100%;
+        padding: 0.65rem 0.85rem;
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        color: #e2e8f0;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-control-dark:focus {
+        background: rgba(30, 41, 59, 0.8);
+        border-color: rgba(251, 191, 36, 0.5);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.1);
+    }
+
+    /* Read-only field styling */
+    .readonly-field {
+        display: flex;
+        align-items: center;
+        padding: 0.65rem 0.85rem;
+        background: rgba(20, 23, 38, 0.6);
+        border: 1px dashed rgba(100, 116, 139, 0.4);
+        border-radius: 6px;
+        color: #94a3b8;
+        font-size: 0.9rem;
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+    }
+
+    .text-muted-small {
+        color: #64748b;
+        font-size: 0.75rem;
+        font-style: italic;
+    }
+
+    /* Alert Warning Contract */
+    .alert-warning-contract {
+        background: rgba(251, 191, 36, 0.08);
+        border: 1px solid rgba(251, 191, 36, 0.2);
+        border-radius: 8px;
+        padding: 1rem;
+        color: #fcd34d;
+        font-size: 0.85rem;
+        margin-top: 1rem;
+    }
+
+    .alert-warning-contract strong {
+        color: #fbbf24;
+    }
+
+    .alert-warning-contract ul {
+        font-size: 0.85rem;
+        line-height: 1.6;
+    }
+
+    .alert-warning-contract li {
+        margin-bottom: 0.35rem;
+    }
+
+    .alert-danger-dark {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        padding: 0.85rem 1rem;
+        color: #fca5a5;
+        font-size: 0.9rem;
+    }
+
+    .validation-message {
+        color: #f87171;
+        font-size: 0.8rem;
+        margin-top: 0.35rem;
+        display: block;
+    }
+
+    .modal-footer-dark {
+        background: rgba(20, 23, 38, 0.4);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 1rem 1.5rem;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        border-radius: 0 0 12px 12px;
+    }
+
+    .btn-secondary-dark {
+        padding: 0.6rem 1.25rem;
+        background: rgba(71, 85, 105, 0.3);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        color: #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+    }
+
+    .btn-secondary-dark:hover:not(:disabled) {
+        background: rgba(71, 85, 105, 0.5);
+        border-color: rgba(148, 163, 184, 0.5);
+        transform: translateY(-1px);
+    }
+
+    .btn-secondary-dark:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .btn-warning-contract {
+        padding: 0.6rem 1.5rem;
+        background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%);
+        border: 1px solid rgba(251, 191, 36, 0.4);
+        color: #fcd34d;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+    }
+
+    .btn-warning-contract:hover:not(:disabled) {
+        background: linear-gradient(135deg, rgba(251, 191, 36, 0.3) 0%, rgba(245, 158, 11, 0.3) 100%);
+        border-color: rgba(251, 191, 36, 0.6);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(251, 191, 36, 0.2);
+    }
+
+    .btn-warning-contract:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    @@media (max-width: 768px) {
+        .modal-dialog {
+            margin: 1rem;
+            max-width: calc(100% - 2rem);
+        }
+
+        .modal-body-dark {
+            padding: 1.25rem 1rem;
+        }
+    }
+</style>
