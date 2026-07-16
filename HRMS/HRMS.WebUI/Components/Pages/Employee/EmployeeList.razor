@@ -3,7 +3,11 @@
 @using HRMS.Application.Interfaces
 @using HRMS.Application.DTOs
 @using HRMS.Domain.Exceptions
+@using HRMS.WebUI.Components.Pages.Employee
 @inject IEmployeeService EmployeeService
+@inject IDepartmentService DepartmentService
+@inject IPositionService PositionService
+@inject IRoleService RoleService
 @inject NavigationManager Navigation
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,HRM,HR")]
 
@@ -99,7 +103,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var emp in GetFilteredEmployees())
+                        @foreach (var emp in GetPaginatedEmployees())
                         {
                             <tr>
                                 <td>
@@ -181,6 +185,92 @@
             </div>
         </div>
 
+        <!-- Pagination Component Enhanced -->
+        @if (GetTotalCount() > 0)
+        {
+            <div class="pagination-wrapper">
+                <!-- Left: Page Size Selector -->
+                <div class="pagination-left">
+                    <div class="page-size-selector">
+                        <label class="page-size-label">Số dòng:</label>
+                        <select class="page-size-dropdown" @onchange="OnPageSizeChanged">
+                            <option value="10" selected="@(pageSize == 10)">10</option>
+                            <option value="20" selected="@(pageSize == 20)">20</option>
+                            <option value="50" selected="@(pageSize == 50)">50</option>
+                            <option value="100" selected="@(pageSize == 100)">100</option>
+                        </select>
+                    </div>
+                    <span class="pagination-text">
+                        Hiển thị @GetStartIndex() đến @GetEndIndex() trên tổng số @GetTotalCount() nhân viên
+                    </span>
+                </div>
+                
+                <!-- Right: Page Navigation Controls -->
+                <div class="pagination-controls">
+                    <button class="pagination-btn" 
+                            @onclick="FirstPage" 
+                            disabled="@(currentPage == 1)"
+                            title="Trang đầu">
+                        <i class="bi bi-chevron-double-left"></i>
+                    </button>
+                    <button class="pagination-btn" 
+                            @onclick="PreviousPage" 
+                            disabled="@(currentPage == 1)"
+                            title="Trang trước">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    
+                    @{
+                        int startPage = Math.Max(1, currentPage - 2);
+                        int endPage = Math.Min(totalPages, currentPage + 2);
+                        
+                        // Always show first page if not in range
+                        if (startPage > 1)
+                        {
+                            <button class="pagination-btn" @onclick="() => GoToPage(1)">1</button>
+                            if (startPage > 2)
+                            {
+                                <span class="pagination-ellipsis">...</span>
+                            }
+                        }
+                        
+                        // Show pages in range
+                        for (int i = startPage; i <= endPage; i++)
+                        {
+                            var pageNum = i;
+                            <button class="pagination-btn @(pageNum == currentPage ? "active" : "")" 
+                                    @onclick="() => GoToPage(pageNum)">
+                                @pageNum
+                            </button>
+                        }
+                        
+                        // Always show last page if not in range
+                        if (endPage < totalPages)
+                        {
+                            if (endPage < totalPages - 1)
+                            {
+                                <span class="pagination-ellipsis">...</span>
+                            }
+                            <button class="pagination-btn" @onclick="() => GoToPage(totalPages)">@totalPages</button>
+                        }
+                    }
+                    
+                    <button class="pagination-btn" 
+                            @onclick="NextPage" 
+                            disabled="@(currentPage == totalPages)"
+                            title="Trang sau">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <button class="pagination-btn" 
+                            @onclick="LastPage" 
+                            disabled="@(currentPage == totalPages)"
+                            title="Trang cuối">
+                        <i class="bi bi-chevron-double-right"></i>
+                    </button>
+                </div>
+            </div>
+        }
+
         @if (!string.IsNullOrEmpty(message))
         {
             <div class="alert @alertClass mt-3">
@@ -191,17 +281,35 @@
     }
 </div>
 
+<!-- Add Employee Modal -->
+<AddEmployeeModal 
+    IsOpen="@isAddModalOpen"
+    OnClose="@CloseAddModal"
+    OnSave="@HandleSaveNewEmployee"
+    Departments="@departmentList"
+    Positions="@positionList"
+    Roles="@roleList" />
+
+<!-- Edit Employee Modal -->
+<EditEmployeeModal 
+    IsOpen="@isEditModalOpen"
+    OnClose="@CloseEditModal"
+    OnSave="@HandleUpdateEmployee"
+    EmployeeData="@selectedEmployee"
+    Departments="@departmentList"
+    Positions="@positionList"
+    Roles="@roleList" />
+
 <!-- Modal hiển thị lỗi Business Rule -->
 @if (showBusinessErrorModal)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7);">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7); z-index: 1050;" @onclick="CloseModal">
+        <div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true" style="z-index: 1051;">
             <div class="modal-content-dark">
                 <div class="modal-header-dark bg-danger">
                     <h5 class="modal-title">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Vi phạm Quy tắc Nghiệp vụ
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Lỗi
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
                 </div>
                 <div class="modal-body-dark">
                     <p class="mb-0">@businessErrorMessage</p>
@@ -220,6 +328,11 @@
     private string selectedDepartment = string.Empty;
     private string selectedStatus = string.Empty;
     
+    // Pagination variables
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalPages => (int)Math.Ceiling((double)GetFilteredEmployees().Count() / pageSize);
+    
     private bool isProcessing = false;
     private int? processingUserId = null;
     private string message = string.Empty;
@@ -227,14 +340,37 @@
     private bool showBusinessErrorModal = false;
     private string businessErrorMessage = string.Empty;
 
+    // Modal states
+    private bool isAddModalOpen = false;
+    private bool isEditModalOpen = false;
+    private UpdateEmployeeDto? selectedEmployee = null;
+
+    // Dropdown data for modals
+    private List<DepartmentDto> departmentList = new();
+    private List<PositionDto> positionList = new();
+    private List<RoleDto> roleList = new();
+
     protected override async Task OnInitializedAsync()
     {
         await LoadEmployees();
+        await LoadDropdownData();
     }
 
     private async Task LoadEmployees()
     {
         employees = await EmployeeService.GetEmployeesWithDetailsAsync();
+    }
+
+    private async Task LoadDropdownData()
+    {
+        // Load departments from service
+        departmentList = await DepartmentService.GetAllAsync();
+        
+        // Load positions from service
+        positionList = await PositionService.GetAllAsync();
+        
+        // Load roles from service
+        roleList = await RoleService.GetAllAsync();
     }
 
     private IEnumerable<EmployeeDto> GetFilteredEmployees()
@@ -270,6 +406,82 @@
         return filtered;
     }
 
+    private IEnumerable<EmployeeDto> GetPaginatedEmployees()
+    {
+        var filtered = GetFilteredEmployees();
+        return filtered.Skip((currentPage - 1) * pageSize).Take(pageSize);
+    }
+
+    private int GetStartIndex()
+    {
+        var total = GetFilteredEmployees().Count();
+        if (total == 0) return 0;
+        return (currentPage - 1) * pageSize + 1;
+    }
+
+    private int GetEndIndex()
+    {
+        var total = GetFilteredEmployees().Count();
+        var end = currentPage * pageSize;
+        return Math.Min(end, total);
+    }
+
+    private int GetTotalCount()
+    {
+        return GetFilteredEmployees().Count();
+    }
+
+    private void FirstPage()
+    {
+        currentPage = 1;
+    }
+
+    private void PreviousPage()
+    {
+        if (currentPage > 1)
+        {
+            currentPage--;
+        }
+    }
+
+    private void NextPage()
+    {
+        if (currentPage < totalPages)
+        {
+            currentPage++;
+        }
+    }
+
+    private void LastPage()
+    {
+        currentPage = totalPages;
+    }
+
+    private void GoToPage(int page)
+    {
+        if (page >= 1 && page <= totalPages)
+        {
+            currentPage = page;
+        }
+    }
+
+    private void OnPageSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int newPageSize))
+        {
+            pageSize = newPageSize;
+            
+            // Recalculate current page to avoid out of range
+            int newTotalPages = (int)Math.Ceiling((double)GetFilteredEmployees().Count() / pageSize);
+            if (currentPage > newTotalPages)
+            {
+                currentPage = Math.Max(1, newTotalPages);
+            }
+            
+            StateHasChanged();
+        }
+    }
+
     private IEnumerable<string> GetUniqueDepartments()
     {
         if (employees == null) return Enumerable.Empty<string>();
@@ -278,32 +490,74 @@
 
     private void ApplyFilters()
     {
+        currentPage = 1; // Reset to first page when filters change
         StateHasChanged();
     }
 
     private void ClearSearch()
     {
         searchKeyword = string.Empty;
+        currentPage = 1; // Reset to first page
         StateHasChanged();
     }
 
     private void OnDepartmentFilterChanged(ChangeEventArgs e)
     {
         selectedDepartment = e.Value?.ToString() ?? string.Empty;
+        currentPage = 1; // Reset to first page
         StateHasChanged();
     }
 
     private void OnStatusFilterChanged(ChangeEventArgs e)
     {
         selectedStatus = e.Value?.ToString() ?? string.Empty;
+        currentPage = 1; // Reset to first page
         StateHasChanged();
     }
 
     private void AddNewEmployee()
     {
-        // TODO: Navigate to add new employee page
-        message = "Chức năng thêm nhân viên đang được phát triển.";
-        alertClass = "alert-info-dark";
+        isAddModalOpen = true;
+    }
+
+    private void CloseAddModal()
+    {
+        isAddModalOpen = false;
+        message = string.Empty;
+    }
+
+    private async Task HandleSaveNewEmployee(CreateEmployeeDto newEmployee)
+    {
+        try
+        {
+            // Call service to create employee
+            var createdEmployee = await EmployeeService.CreateAsync(newEmployee);
+            
+            // Show success message
+            message = $"Đã thêm nhân viên {createdEmployee.FullName} (Mã: {createdEmployee.EmployeeCode}) thành công.";
+            alertClass = "alert-success-dark";
+            
+            // Close modal
+            isAddModalOpen = false;
+            
+            // Reload employee list
+            await LoadEmployees();
+            
+            // Reset to first page
+            currentPage = 1;
+        }
+        catch (BusinessException ex)
+        {
+            businessErrorMessage = ex.Message;
+            showBusinessErrorModal = true;
+            isAddModalOpen = false;
+        }
+        catch (Exception ex)
+        {
+            message = $"Lỗi hệ thống: {ex.Message}";
+            alertClass = "alert-danger-dark";
+            isAddModalOpen = false;
+        }
     }
 
     private string GetInitials(string fullName)
@@ -324,9 +578,97 @@
 
     private void EditEmployee(int employeeId)
     {
-        // TODO: Navigate to edit page
-        message = "Chức năng chỉnh sửa đang được phát triển.";
-        alertClass = "alert-info-dark";
+        var employee = employees?.FirstOrDefault(e => e.Id == employeeId);
+        if (employee != null)
+        {
+            // Convert EmployeeDto to UpdateEmployeeDto
+            selectedEmployee = new UpdateEmployeeDto
+            {
+                Id = employee.Id,
+                EmployeeCode = employee.EmployeeCode,
+                FullName = employee.FullName,
+                EmailCompany = employee.EmailCompany,
+                Phone = employee.Phone,
+                Gender = employee.Gender,
+                DepartmentId = employee.DepartmentId,
+                PositionId = employee.PositionId,
+                RoleId = roleList.FirstOrDefault()?.Id ?? 1, // Default to first role if available
+                DateOfBirth = employee.DateOfBirth,
+                Status = employee.Status
+            };
+            
+            isEditModalOpen = true;
+            message = string.Empty;
+        }
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalOpen = false;
+        selectedEmployee = null;
+        message = string.Empty;
+    }
+
+    private async Task HandleUpdateEmployee(UpdateEmployeeDto updatedEmployee)
+    {
+        try
+        {
+            // Call service to update employee
+            bool success = await EmployeeService.UpdateAsync(updatedEmployee);
+            
+            if (!success)
+            {
+                message = "Không tìm thấy nhân viên để cập nhật.";
+                alertClass = "alert-danger-dark";
+                isEditModalOpen = false;
+                selectedEmployee = null;
+                return;
+            }
+            
+            // Update the employee in the list (for immediate UI update)
+            var employee = employees?.FirstOrDefault(e => e.Id == updatedEmployee.Id);
+            if (employee != null)
+            {
+                employee.FullName = updatedEmployee.FullName;
+                employee.EmailCompany = updatedEmployee.EmailCompany;
+                employee.Phone = updatedEmployee.Phone;
+                employee.Gender = updatedEmployee.Gender;
+                employee.DepartmentId = updatedEmployee.DepartmentId!.Value;
+                employee.PositionId = updatedEmployee.PositionId!.Value;
+                employee.DateOfBirth = updatedEmployee.DateOfBirth;
+                employee.Status = updatedEmployee.Status;
+                
+                // Update department and position names
+                var dept = departmentList.FirstOrDefault(d => d.Id == updatedEmployee.DepartmentId);
+                var pos = positionList.FirstOrDefault(p => p.Id == updatedEmployee.PositionId);
+                if (dept != null) employee.DepartmentName = dept.Name;
+                if (pos != null) employee.PositionName = pos.Name;
+            }
+            
+            message = $"Đã cập nhật thông tin nhân viên {updatedEmployee.FullName} thành công.";
+            alertClass = "alert-success-dark";
+            
+            // Close modal
+            isEditModalOpen = false;
+            selectedEmployee = null;
+            
+            // Force UI update
+            StateHasChanged();
+        }
+        catch (BusinessException ex)
+        {
+            businessErrorMessage = ex.Message;
+            showBusinessErrorModal = true;
+            isEditModalOpen = false;
+            selectedEmployee = null;
+        }
+        catch (Exception ex)
+        {
+            message = $"Lỗi hệ thống: {ex.Message}";
+            alertClass = "alert-danger-dark";
+            isEditModalOpen = false;
+            selectedEmployee = null;
+        }
     }
 
     private async Task ToggleStatus(EmployeeDto employee)
@@ -484,6 +826,8 @@
     .btn-clear-search:hover {
         color: #ef4444;
     }
+
+    
 
     /* Filter Items */
     .filter-item {
@@ -807,21 +1151,32 @@
         border-radius: 12px;
         backdrop-filter: blur(20px);
         color: #e2e8f0;
+        position: relative;
+        z-index: 1052;
     }
 
     .modal-header-dark {
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         padding: 1.25rem 1.5rem;
+        position: relative;
+        z-index: 1053;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
     }
 
     .modal-body-dark {
         padding: 1.5rem;
         color: #cbd5e1;
+        position: relative;
+        z-index: 1;
     }
 
     .modal-footer-dark {
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         padding: 1rem 1.5rem;
+        position: relative;
+        z-index: 1;
     }
 
     .btn-secondary-dark {
@@ -830,15 +1185,209 @@
         color: #e2e8f0;
         padding: 0.5rem 1.25rem;
         border-radius: 6px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        position: relative;
+        z-index: 10;
     }
 
     .btn-secondary-dark:hover {
         background: rgba(100, 116, 139, 0.5);
         border-color: rgba(100, 116, 139, 0.7);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-secondary-dark:active {
+        transform: translateY(0);
+    }
+
+    .btn-close {
+        filter: brightness(0) invert(1);
+        opacity: 0.8;
+        position: relative;
+        z-index: 10;
+        cursor: pointer;
+    }
+
+    .btn-close:hover {
+        opacity: 1;
     }
 
     /* Text Utilities */
     .text-muted-light {
         color: #94a3b8 !important;
+    }
+
+    /* ============================================
+       PAGINATION COMPONENT ENHANCED
+       ============================================ */
+    .pagination-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.25rem 1.5rem;
+        background: rgba(20, 23, 38, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-top: none;
+        border-radius: 0 0 12px 12px;
+        margin-top: -1px;
+        gap: 2rem;
+    }
+
+    /* Left Side: Page Size Selector + Info */
+    .pagination-left {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        flex: 1;
+    }
+
+    .page-size-selector {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .page-size-label {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .page-size-dropdown {
+        min-width: 80px;
+        height: 36px;
+        padding: 0.5rem 2rem 0.5rem 0.75rem;
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        color: #e2e8f0;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.5rem center;
+        background-size: 14px 10px;
+        appearance: none;
+    }
+
+    .page-size-dropdown:hover {
+        background-color: rgba(30, 41, 59, 0.8);
+        border-color: rgba(59, 130, 246, 0.5);
+    }
+
+    .page-size-dropdown:focus {
+        outline: none;
+        border-color: rgba(59, 130, 246, 0.5);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .page-size-dropdown option {
+        background: #1e293b;
+        color: #e2e8f0;
+    }
+
+    .pagination-text {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        font-weight: 400;
+        white-space: nowrap;
+    }
+
+    /* Right Side: Page Controls */
+    .pagination-controls {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    .pagination-btn {
+        min-width: 36px;
+        height: 36px;
+        padding: 0 0.5rem;
+        background: rgba(30, 41, 59, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        color: #cbd5e1;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+
+    .pagination-btn:hover:not(:disabled):not(.active) {
+        background: rgba(51, 65, 85, 0.6);
+        border-color: rgba(255, 255, 255, 0.2);
+        color: #e2e8f0;
+    }
+
+    .pagination-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .pagination-btn.active {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        border-color: rgba(59, 130, 246, 0.5);
+        color: white;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .pagination-btn i {
+        font-size: 0.75rem;
+    }
+
+    /* Pagination Ellipsis */
+    .pagination-ellipsis {
+        color: #64748b;
+        font-size: 1rem;
+        padding: 0 0.25rem;
+        user-select: none;
+    }
+
+    /* Responsive Pagination */
+    @@media (max-width: 992px) {
+        .pagination-wrapper {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: stretch;
+        }
+
+        .pagination-left {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .pagination-controls {
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .pagination-text {
+            white-space: normal;
+        }
+    }
+
+    @@media (max-width: 576px) {
+        .pagination-btn {
+            min-width: 32px;
+            height: 32px;
+            font-size: 0.8125rem;
+        }
+
+        .page-size-dropdown {
+            min-width: 70px;
+            font-size: 0.8125rem;
+        }
     }
 </style>

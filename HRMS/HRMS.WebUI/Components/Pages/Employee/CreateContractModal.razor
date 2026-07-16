@@ -1,0 +1,485 @@
+@using HRMS.Application.DTOs
+@using HRMS.Application.Interfaces
+@using HRMS.Domain.Exceptions
+@inject IContractService ContractService
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block modal-backdrop-click" tabindex="-1" @onclick="HandleBackdropClick">
+        <div class="modal-dialog modal-dialog-centered modal-lg" @onclick:stopPropagation="true">
+            <div class="modal-content-dark">
+                <!-- Header -->
+                <div class="modal-header-dark">
+                    <h5 class="modal-title">
+                        <i class="bi bi-file-earmark-text text-success me-2"></i>
+                        Tạo hợp đồng lao động mới
+                    </h5>
+                </div>
+
+                <!-- Body -->
+                <div class="modal-body-dark">
+                    <EditForm Model="@model" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="row g-3">
+                            <!-- Column 1 -->
+                            <div class="col-md-6">
+                                <!-- Loại hợp đồng -->
+                                <div class="form-group-dark">
+                                    <label class="form-label-dark">
+                                        <i class="bi bi-file-text me-1"></i>Loại hợp đồng <span class="text-danger">*</span>
+                                    </label>
+                                    <InputSelect class="form-control-dark" @bind-Value="model.ContractType">
+                                        <option value="">-- Chọn loại hợp đồng --</option>
+                                        @foreach (var type in contractTypes)
+                                        {
+                                            <option value="@type">@type</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="@(() => model.ContractType)" class="validation-message" />
+                                </div>
+
+                                <!-- Ngày bắt đầu -->
+                                <div class="form-group-dark">
+                                    <label class="form-label-dark">
+                                        <i class="bi bi-calendar-check me-1"></i>Ngày bắt đầu <span class="text-danger">*</span>
+                                    </label>
+                                    <InputDate class="form-control-dark" @bind-Value="startDate" />
+                                    <ValidationMessage For="@(() => model.StartDate)" class="validation-message" />
+                                </div>
+
+                                <!-- Lương cơ bản -->
+                                <div class="form-group-dark">
+                                    <label class="form-label-dark">
+                                        <i class="bi bi-currency-dollar me-1"></i>Lương cơ bản (VNĐ) <span class="text-danger">*</span>
+                                    </label>
+                                    <InputNumber class="form-control-dark" @bind-Value="model.BaseSalary" step="100000" />
+                                    <ValidationMessage For="@(() => model.BaseSalary)" class="validation-message" />
+                                </div>
+                            </div>
+
+                            <!-- Column 2 -->
+                            <div class="col-md-6">
+                                <!-- Ngày kết thúc -->
+                                <div class="form-group-dark">
+                                    <label class="form-label-dark">
+                                        <i class="bi bi-calendar-x me-1"></i>Ngày kết thúc <span class="text-danger">*</span>
+                                    </label>
+                                    <InputDate class="form-control-dark" @bind-Value="endDate" />
+                                    <ValidationMessage For="@(() => model.EndDate)" class="validation-message" />
+                                    @if (endDate < startDate)
+                                    {
+                                        <div class="text-danger small mt-1">
+                                            <i class="bi bi-exclamation-circle me-1"></i>Ngày kết thúc phải >= Ngày bắt đầu
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- Info box -->
+                                <div class="alert alert-info-contract">
+                                    <div class="d-flex align-items-start">
+                                        <i class="bi bi-info-circle-fill me-2 mt-1" style="font-size: 1.1rem;"></i>
+                                        <div>
+                                            <strong>Lưu ý quan trọng:</strong>
+                                            <ul class="mb-0 mt-2 ps-3">
+                                                <li>Trạng thái khởi tạo: <span class="badge badge-active-small">Hiệu lực</span></li>
+                                                <li>Hợp đồng <strong>không thể chỉnh sửa</strong> sau khi tạo</li>
+                                                <li>Chỉ <strong>HRM</strong> mới có quyền chỉnh sửa</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger-dark mt-3">
+                                <i class="bi bi-exclamation-triangle me-2"></i>@errorMessage
+                            </div>
+                        }
+                    </EditForm>
+                </div>
+
+                <!-- Footer -->
+                <div class="modal-footer-dark">
+                    <button type="button" class="btn btn-secondary-dark" @onclick="CloseModal" disabled="@isSubmitting">
+                        <i class="bi bi-x-circle me-1"></i>Đóng
+                    </button>
+                    <button type="button" class="btn btn-success-contract" @onclick="HandleValidSubmit" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Đang tạo...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-check-circle me-1"></i>
+                            <span>Tạo hợp đồng</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public int UserId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<ContractDto> OnSave { get; set; }
+
+    private CreateContractDto model = new();
+    private List<string> contractTypes = new();
+    private bool isSubmitting = false;
+    private string errorMessage = string.Empty;
+
+    // Date handling for DateOnly conversion
+    private DateTime startDate = DateTime.Today;
+    private DateTime endDate = DateTime.Today.AddYears(1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadContractTypes();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen)
+        {
+            // Reset form when modal opens
+            model = new CreateContractDto
+            {
+                UserId = UserId,
+                StartDate = DateOnly.FromDateTime(DateTime.Today),
+                EndDate = DateOnly.FromDateTime(DateTime.Today.AddYears(1)),
+                BaseSalary = 0,
+                ContractType = string.Empty
+            };
+            
+            startDate = DateTime.Today;
+            endDate = DateTime.Today.AddYears(1);
+            errorMessage = string.Empty;
+            isSubmitting = false;
+        }
+    }
+
+    private async Task LoadContractTypes()
+    {
+        try
+        {
+            contractTypes = await ContractService.GetContractTypesAsync();
+        }
+        catch (Exception)
+        {
+            contractTypes = new List<string>
+            {
+                "Thử việc",
+                "Có thời hạn (1 năm)",
+                "Có thời hạn (2 năm)",
+                "Có thời hạn (3 năm)",
+                "Không thời hạn"
+            };
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (isSubmitting) return;
+
+        try
+        {
+            isSubmitting = true;
+            errorMessage = string.Empty;
+
+            // Convert DateTime to DateOnly
+            model.StartDate = DateOnly.FromDateTime(startDate);
+            model.EndDate = DateOnly.FromDateTime(endDate);
+            model.UserId = UserId;
+
+            // Validate dates
+            if (model.EndDate < model.StartDate)
+            {
+                errorMessage = "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.";
+                return;
+            }
+
+            // Validate required fields
+            if (string.IsNullOrWhiteSpace(model.ContractType))
+            {
+                errorMessage = "Vui lòng chọn loại hợp đồng.";
+                return;
+            }
+
+            if (model.BaseSalary <= 0)
+            {
+                errorMessage = "Lương cơ bản phải lớn hơn 0.";
+                return;
+            }
+
+            // Call service to create contract
+            var createdContract = await ContractService.CreateAsync(model);
+
+            // Invoke callback to parent component
+            await OnSave.InvokeAsync(createdContract);
+
+            // Close modal
+            await CloseModal();
+        }
+        catch (BusinessException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi hệ thống: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task HandleBackdropClick()
+    {
+        if (!isSubmitting)
+        {
+            await CloseModal();
+        }
+    }
+}
+
+<style>
+    /* ============================================
+       CREATE CONTRACT MODAL - DARK THEME
+       ============================================ */
+
+    /* Modal Backdrop - Fix z-index and pointer events */
+    .modal-backdrop-click {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 1050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-dialog {
+        position: relative;
+        z-index: 1051;
+        max-width: 900px;
+        margin: 0 auto;
+        pointer-events: auto; /* Ensure dialog can receive clicks */
+    }
+
+    .modal-content-dark {
+        background: linear-gradient(145deg, #1e1e2f 0%, #16182a 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        pointer-events: auto; /* Critical: Allow clicks inside modal */
+    }
+
+    .modal-header-dark {
+        background: rgba(20, 23, 38, 0.6);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 1.25rem 1.5rem;
+        border-radius: 12px 12px 0 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-title {
+        color: #f1f5f9;
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .modal-body-dark {
+        padding: 1.75rem 1.5rem;
+        color: #e2e8f0;
+    }
+
+    .form-group-dark {
+        margin-bottom: 1.25rem;
+    }
+
+    .form-label-dark {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #cbd5e1;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .form-control-dark {
+        width: 100%;
+        padding: 0.65rem 0.85rem;
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        color: #e2e8f0;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-control-dark:focus {
+        background: rgba(30, 41, 59, 0.8);
+        border-color: rgba(34, 197, 94, 0.5);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+    }
+
+    .form-control-dark::placeholder {
+        color: #64748b;
+    }
+
+    /* Alert Info Contract */
+    .alert-info-contract {
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 8px;
+        padding: 1rem;
+        color: #93c5fd;
+        font-size: 0.85rem;
+        margin-top: 1rem;
+    }
+
+    .alert-info-contract strong {
+        color: #60a5fa;
+    }
+
+    .alert-info-contract ul {
+        font-size: 0.85rem;
+        line-height: 1.6;
+    }
+
+    .alert-info-contract li {
+        margin-bottom: 0.35rem;
+    }
+
+    .badge-pending-small {
+        background: rgba(251, 191, 36, 0.15);
+        color: #fbbf24;
+        border: 1px solid rgba(251, 191, 36, 0.3);
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .badge-active-small {
+        background: rgba(34, 197, 94, 0.15);
+        color: #86efac;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    /* Alert Danger */
+    .alert-danger-dark {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        padding: 0.85rem 1rem;
+        color: #fca5a5;
+        font-size: 0.9rem;
+    }
+
+    .validation-message {
+        color: #f87171;
+        font-size: 0.8rem;
+        margin-top: 0.35rem;
+        display: block;
+    }
+
+    .modal-footer-dark {
+        background: rgba(20, 23, 38, 0.4);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 1rem 1.5rem;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        border-radius: 0 0 12px 12px;
+    }
+
+    .btn-secondary-dark {
+        padding: 0.6rem 1.25rem;
+        background: rgba(71, 85, 105, 0.3);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        color: #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+    }
+
+    .btn-secondary-dark:hover:not(:disabled) {
+        background: rgba(71, 85, 105, 0.5);
+        border-color: rgba(148, 163, 184, 0.5);
+        transform: translateY(-1px);
+    }
+
+    .btn-secondary-dark:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .btn-success-contract {
+        padding: 0.6rem 1.5rem;
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%);
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        color: #86efac;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+    }
+
+    .btn-success-contract:hover:not(:disabled) {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(22, 163, 74, 0.3) 100%);
+        border-color: rgba(34, 197, 94, 0.6);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+    }
+
+    .btn-success-contract:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .modal-dialog {
+            margin: 1rem;
+            max-width: calc(100% - 2rem);
+        }
+
+        .modal-body-dark {
+            padding: 1.25rem 1rem;
+        }
+    }
+</style>
