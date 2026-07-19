@@ -93,9 +93,7 @@
                                         <i class="bi bi-shield-check me-1"></i>Trạng thái <span class="text-danger">*</span>
                                     </label>
                                     <InputSelect class="form-control-dark" @bind-Value="model.Status">
-                                        <option value="Pending">Chờ duyệt</option>
                                         <option value="Active">Hiệu lực</option>
-                                        <option value="Rejected">Từ chối</option>
                                         <option value="Draft">Nháp</option>
                                     </InputSelect>
                                     <ValidationMessage For="@(() => model.Status)" class="validation-message" />
@@ -108,7 +106,7 @@
                                         <div>
                                             <strong>Lưu ý quan trọng:</strong>
                                             <ul class="mb-0 mt-2 ps-3">
-                                                <li>Chỉ <strong>HRM</strong> mới có quyền chỉnh sửa</li>
+                                                <li>Chỉ <strong>HR/HRM</strong> mới có quyền chỉnh sửa</li>
                                                 <li>Mã hợp đồng <strong>không thể</strong> thay đổi</li>
                                                 <li>Kiểm tra kỹ trước khi lưu thay đổi</li>
                                             </ul>
