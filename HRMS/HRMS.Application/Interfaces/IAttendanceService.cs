@@ -30,6 +30,27 @@ public interface IAttendanceService
     /// </summary>
     /// <param name="periodId">ID của kỳ công cần khóa.</param>
     Task LockPeriodAsync(int periodId);
+
+    /// <summary>
+    /// Lấy danh sách tất cả bản ghi chấm công (AttendanceLogs) của một kỳ công.
+    /// Kết quả bao gồm tên + mã nhân viên để hiển thị lên bảng.
+    /// </summary>
+    /// <param name="periodId">ID kỳ công cần lọc.</param>
+    Task<List<AttendanceLogDto>> GetLogsAsync(int periodId);
+
+    /// <summary>
+    /// Cập nhật thủ công một bản ghi chấm công.
+    /// Nghiệp vụ: không cho phép sửa nếu kỳ công tương ứng đã bị khóa.
+    /// </summary>
+    /// <param name="logId">ID bản ghi AttendanceLog cần sửa.</param>
+    /// <param name="dto">Dữ liệu mới (giờ quẹt thẻ, loại IN/OUT).</param>
+    Task UpdateLogAsync(int logId, UpdateAttendanceLogDto dto);
+
+    /// <summary>
+    /// Lấy chi tiết một bản ghi chấm công theo Id (để phục vụ trang sửa).
+    /// </summary>
+    /// <param name="logId">ID bản ghi chấm công cần lấy.</param>
+    Task<AttendanceLogDto?> GetLogByIdAsync(int logId);
 }
 
 /// <summary>DTO đơn giản cho dropdown chọn kỳ công.</summary>

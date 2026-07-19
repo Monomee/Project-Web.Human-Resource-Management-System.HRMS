@@ -24,11 +24,27 @@ namespace HRMS.Infrastructure
 
             // Đăng ký dịch vụ quản lý nhân viên EmployeeService
             services.AddScoped<IEmployeeService, EmployeeService>();
+            
+            // Đăng ký dịch vụ quản lý phòng ban
+            services.AddScoped<IDepartmentService, DepartmentService>();
+            
+            // Đăng ký dịch vụ quản lý chức vụ
+            services.AddScoped<IPositionService, PositionService>();
+            
+            // Đăng ký dịch vụ quản lý vai trò
+            services.AddScoped<IRoleService, RoleService>();
+            
             // Đăng ký dịch vụ đọc file Excel (Task 3.3)
             services.AddScoped<IExcelParserService, ExcelParserService>();
 
             // Đăng ký dịch vụ nghiệp vụ chấm công (Task 3.3)
             services.AddScoped<IAttendanceService, AttendanceService>();
+
+            // Đăng ký dịch vụ quản lý hợp đồng
+            services.AddScoped<IContractService, ContractService>();
+
+            // Đăng ký dịch vụ quản lý kỳ công (TimesheetPeriod CRU)
+            services.AddScoped<ITimePeriodService, TimePeriodService>();
 
             return services;
         }

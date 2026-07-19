@@ -26,7 +26,6 @@
 
   <ItemGroup>
     <Folder Include="Components\Pages\Auth\" />
-    <Folder Include="Components\Pages\Employee\" />
     <Folder Include="Components\Pages\Attendance\" />
     <Folder Include="Components\Pages\Payroll\" />
     <Folder Include="Components\Pages\Requests\" />

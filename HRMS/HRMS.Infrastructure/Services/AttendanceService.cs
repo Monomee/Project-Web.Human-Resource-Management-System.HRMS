@@ -238,6 +238,85 @@ public class AttendanceService : IAttendanceService
     }
 
     // ════════════════════════════════════════════════════════════════
+    // 4. LẤY DANH SÁCH BẢN GHI CHẤM CÔNG THEO KỲ
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Lấy danh sách bản ghi chấm công của một kỳ công cụ thể.
+    /// Dùng Include (eager loading) để kéo thêm dữ liệu User trong cùng một query,
+    /// tránh vấn đề N+1 (query trong vòng lặp).
+    /// </summary>
+    public async Task<List<AttendanceLogDto>> GetLogsAsync(int periodId)
+    {
+        return await _db.AttendanceLogs
+            .Where(log => log.PeriodId == periodId)
+            .OrderBy(log => log.CheckedAt)  // sắp xếp theo thời gian tăng dần
+            .Select(log => new AttendanceLogDto
+            {
+                Id           = log.Id,
+                CheckedAt    = log.CheckedAt,
+                CheckType    = log.CheckType,
+                Source       = log.Source,
+                UserId       = log.UserId,
+                EmployeeCode = log.User.EmployeeCode,
+                EmployeeName = log.User.FullName,
+                PeriodId     = log.PeriodId
+            })
+            .ToListAsync();
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 5. CẬP NHẬT THỦ CÔNG MỘT BẢN GHI CHẤM CÔNG
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Cập nhật thủ công một bản ghi quẹt thẻ.
+    /// Nghiệp vụ: không được sửa nếu kỳ công tương ứng đã bị khóa.
+    /// Intern đọc: đây là "sửa tay" — HR dùng khi dữ liệu Excel bị sai hoặc máy quẹt thẻ ghi sai giờ.
+    /// </summary>
+    public async Task UpdateLogAsync(int logId, UpdateAttendanceLogDto dto)
+    {
+        // ── Lấy bản ghi + kỳ công trong 1 query (Include) ─────────────────
+        var log = await _db.AttendanceLogs
+            .Include(l => l.Period)  // cần Period.IsLocked để kiểm tra
+            .FirstOrDefaultAsync(l => l.Id == logId)
+            ?? throw new InvalidOperationException($"Không tìm thấy bản ghi chấm công ID={logId}.");
+
+        // ── Nghiệp vụ: không cho sửa khi kỳ đã khóa ────────────────
+        if (log.Period.IsLocked)
+            throw new InvalidOperationException(
+                $"Kỳ công '{log.Period.Name}' đã bị khóa. Không thể sửa bản ghi chấm công.");
+
+        // ── Cập nhật và lưu ─────────────────────────────────
+        log.CheckedAt = dto.CheckedAt;
+        log.CheckType = dto.CheckType.Trim().ToUpperInvariant();
+        log.Source    = "Manual";  // Đánh dấu nguồn gốc: HR sửa thủ công
+
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Lấy chi tiết bản ghi chấm công kèm thông tin nhân viên theo Id.
+    /// </summary>
+    public async Task<AttendanceLogDto?> GetLogByIdAsync(int logId)
+    {
+        return await _db.AttendanceLogs
+            .Where(log => log.Id == logId)
+            .Select(log => new AttendanceLogDto
+            {
+                Id           = log.Id,
+                CheckedAt    = log.CheckedAt,
+                CheckType    = log.CheckType,
+                Source       = log.Source,
+                UserId       = log.UserId,
+                EmployeeCode = log.User.EmployeeCode,
+                EmployeeName = log.User.FullName,
+                PeriodId     = log.PeriodId
+            })
+            .FirstOrDefaultAsync();
+    }
+
+    // ════════════════════════════════════════════════════════════════
     // THUẬT TOÁN TÍNH NGÀY CÔNG — PRIVATE HELPER
     //
     // Trả về: (workValue, lateMinutes, note)
