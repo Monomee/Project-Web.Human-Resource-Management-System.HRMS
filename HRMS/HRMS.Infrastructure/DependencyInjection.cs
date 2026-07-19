@@ -43,6 +43,9 @@ namespace HRMS.Infrastructure
             // Đăng ký dịch vụ quản lý hợp đồng
             services.AddScoped<IContractService, ContractService>();
 
+            // Đăng ký dịch vụ quản lý kỳ công (TimesheetPeriod CRU)
+            services.AddScoped<ITimePeriodService, TimePeriodService>();
+
             return services;
         }
     }

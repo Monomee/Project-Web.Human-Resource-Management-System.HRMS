@@ -1,0 +1,231 @@
+@page "/attendance/periods"
+@rendermode InteractiveServer
+
+@*
+    TimePeriodList.razor — Quản lý Kỳ công (TimesheetPeriod)
+
+    Chức năng:
+      - Hiển thị danh sách tất cả kỳ công dưới dạng bảng.
+      - Nút "Tạo kỳ công mới" chuyển hướng sang trang tạo mới: /attendance/periods/create.
+      - Nút "Sửa" trên mỗi dòng (kỳ công chưa khóa) chuyển hướng sang trang sửa: /attendance/periods/edit/{Id}.
+      - Kỳ đã khóa: hiển thị gạch ngang (không cho sửa).
+*@
+
+@using HRMS.Application.Interfaces
+@inject ITimePeriodService TimePeriodService
+@inject NavigationManager Navigation
+
+<PageTitle>Quản lý Kỳ công — HRMS</PageTitle>
+
+<div class="tp-page">
+
+    @* ── TIÊU ĐỀ TRANG ── *@
+    <div class="tp-header">
+        <div class="tp-header-icon">📅</div>
+        <div class="tp-header-text">
+            <h1 class="tp-title">Quản lý Kỳ công</h1>
+            <p class="tp-subtitle">Tạo và quản lý các kỳ tính công theo tháng / quý.</p>
+        </div>
+        <a class="btn btn-primary" href="/attendance/periods/create">
+            ＋ Tạo kỳ công mới
+        </a>
+    </div>
+
+    @* ── BẢNG DANH SÁCH KỲ CÔNG ── *@
+    @if (_isLoading)
+    {
+        <div class="tp-loading">⏳ Đang tải dữ liệu...</div>
+    }
+    else if (_periods.Count == 0)
+    {
+        <div class="tp-empty">
+            <span>📭</span>
+            <p>Chưa có kỳ công nào. Hãy tạo kỳ công đầu tiên!</p>
+            <a class="btn btn-primary" href="/attendance/periods/create">Tạo ngay</a>
+        </div>
+    }
+    else
+    {
+        <div class="tp-table-wrapper">
+            <table class="tp-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Tên kỳ công</th>
+                        <th>Bắt đầu</th>
+                        <th>Kết thúc</th>
+                        <th>Số ngày</th>
+                        <th>Trạng thái</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < _periods.Count; i++)
+                    {
+                        var p = _periods[i];
+                        var rowNum = i + 1;
+                        <tr class="@(p.IsLocked ? "row-locked" : "row-open")">
+                            <td class="td-num">@rowNum</td>
+                            <td class="td-name">@p.Name</td>
+                            <td class="td-date">@p.StartDate.ToString("dd/MM/yyyy")</td>
+                            <td class="td-date">@p.EndDate.ToString("dd/MM/yyyy")</td>
+                            <td class="td-center">
+                                @(p.EndDate.DayNumber - p.StartDate.DayNumber + 1) ngày
+                            </td>
+                            <td class="td-center">
+                                @if (p.IsLocked)
+                                {
+                                    <span class="badge badge-locked">🔒 Đã khóa</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-open">✅ Đang mở</span>
+                                }
+                            </td>
+                            <td class="td-actions">
+                                @if (!p.IsLocked)
+                                {
+                                    <a class="btn-icon btn-edit"
+                                       title="Sửa kỳ công này"
+                                       href="/attendance/periods/edit/@p.Id">
+                                        ✏️ Sửa
+                                    </a>
+                                }
+                                else
+                                {
+                                    <span class="locked-hint" title="Kỳ đã khóa, không thể sửa">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+</div>
+
+@* ── STYLE ── *@
+<style>
+    .tp-page {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    /* Header */
+    .tp-header {
+        display: flex;
+        align-items: center;
+        gap: 1.2rem;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid #e8ecf0;
+        flex-wrap: wrap;
+    }
+    .tp-header-icon  { font-size: 2.4rem; }
+    .tp-header-text  { flex: 1; }
+    .tp-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: white;
+        margin: 0 0 0.2rem 0;
+    }
+    .tp-subtitle { color: white; margin: 0; font-size: 0.93rem; }
+
+    /* Loading / Empty */
+    .tp-loading { text-align: center; color: #9ca3af; padding: 3rem; font-size: 1rem; }
+    .tp-empty   { text-align: center; padding: 4rem 2rem; color: #6b7280; }
+    .tp-empty span { font-size: 3rem; display: block; margin-bottom: 0.75rem; }
+
+    /* Table */
+    .tp-table-wrapper {
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .tp-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .tp-table thead th {
+        background: #f1f5f9;
+        color: #475569;
+        font-weight: 700;
+        padding: 0.85rem 1rem;
+        text-align: left;
+        border-bottom: 2px solid #e2e8f0;
+        white-space: nowrap;
+    }
+    .tp-table tbody tr { transition: background 0.15s; }
+    .tp-table tbody tr:hover { background: #f8fafc; }
+    .tp-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #f1f5f9;
+        color: #374151;
+        vertical-align: middle;
+    }
+    .row-locked { background: #fafafa; }
+    .row-open   { background: #fff; }
+
+    .td-num    { width: 48px; color: #9ca3af; font-size: 0.82rem; }
+    .td-name   { font-weight: 600; }
+    .td-date   { font-family: monospace; font-size: 0.88rem; }
+    .td-center { text-align: center; }
+    .td-actions{ text-align: center; }
+
+    /* Badges */
+    .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+    .badge-locked { background: #f1f5f9; color: #64748b; }
+    .badge-open   { background: #dcfce7; color: #15803d; }
+
+    /* Action buttons */
+    .btn-icon {
+        display: inline-block;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #2563eb;
+        cursor: pointer;
+        font-size: 0.82rem;
+        padding: 0.3rem 0.7rem;
+        border-radius: 6px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background 0.15s;
+    }
+    .btn-icon:hover { background: #dbeafe; }
+    .locked-hint    { color: #d1d5db; font-size: 0.85rem; }
+
+    /* Buttons */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.6rem 1.3rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.93rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s, transform 0.15s;
+        text-decoration: none;
+    }
+    .btn:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-primary   { background: #4f7ef7; color: #fff; }
+</style>
+
+@code {
+    private List<TimesheetPeriodDto> _periods   = new();
+    private bool                      _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        _periods   = await TimePeriodService.GetAllAsync();
+        _isLoading = false;
+    }
+}
