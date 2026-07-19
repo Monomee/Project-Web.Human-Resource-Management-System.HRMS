@@ -224,7 +224,7 @@
                                             }
                                         </td>
                                         <td class="text-end">
-                                            <strong class="text-success">
+                                            <strong class="salary-amount">
                                                 @contract.BaseSalary.ToString("N0") VNĐ
                                             </strong>
                                         </td>
@@ -598,6 +598,13 @@
 
     .btn-edit-contract:active {
         transform: translateY(0);
+    }
+
+    /* Salary Amount - Màu xanh đậm hơn */
+    .salary-amount {
+        color: #10b981 !important; /* Xanh lá đậm hơn */
+        font-weight: 700;
+        font-size: 1rem;
     }
 
     /* Card Body Dark */
