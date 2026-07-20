@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using HRMS.Domain.Entities;
+using HRMS.Application.Interfaces;
 
 namespace HRMS.Infrastructure.Persistence;
 
-public partial class ApplicationDbContext : DbContext
+public partial class ApplicationDbContext : DbContext, IApplicationDbContext
 {
     public ApplicationDbContext()
     {
@@ -39,6 +40,10 @@ public partial class ApplicationDbContext : DbContext
     public virtual DbSet<TimesheetPeriod> TimesheetPeriods { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+
+    public DbSet<EmployeeRequest> EmployeeRequests => Set<EmployeeRequest>();
+    public DbSet<OvertimeRecord> OvertimeRecords => Set<OvertimeRecord>();
+    public DbSet<TimesheetAdjustment> TimesheetAdjustments => Set<TimesheetAdjustment>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
 

@@ -15,10 +15,11 @@
     <Folder Include="Features\Attendance\" />
     <Folder Include="Features\Requests\" />
     <Folder Include="Features\Payroll\" />
-    <Folder Include="Interfaces\" />
+	<Folder Include="Interfaces\" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.27" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
   </ItemGroup>

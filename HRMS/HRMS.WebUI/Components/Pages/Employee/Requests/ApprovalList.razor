@@ -1,0 +1,375 @@
+@page "/requests/approvals"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+
+@using System.Security.Claims
+@using HRMS.Application.DTOs
+@using HRMS.Application.Interfaces
+@using Microsoft.AspNetCore.SignalR.Client
+@using HRMS.Domain.Entities
+
+@inject IRequestService RequestService
+@inject NavigationManager NavManager
+@inject AuthenticationStateProvider AuthStateProvider
+@implements IAsyncDisposable
+
+<PageTitle>Phê duyệt Đơn từ — HRMS</PageTitle>
+
+<div class="approval-page animate-fade-in">
+    @* Page Header *@
+    <div class="page-header mb-4">
+        <div class="page-header-icon"><i class="bi bi-check-all fs-3"></i></div>
+        <div>
+            <h1 class="page-title text-white">Quản lý Phê duyệt Đơn từ</h1>
+            <p class="page-subtitle text-muted-light">Xử lý các yêu cầu nghỉ phép, làm thêm giờ và khiếu nại công từ nhân viên.</p>
+        </div>
+    </div>
+
+    @if (!_accountResolved)
+    {
+        <div class="alert alert-danger-custom d-flex align-items-center mb-4">
+            <span class="bi bi-exclamation-octagon-fill me-2 fs-5"></span>
+            <div>@_errorMessage</div>
+        </div>
+    }
+    else
+    {
+        @* Tab Navigation *@
+        <div class="tabs-container mb-4">
+            <button class="tab-button @(_activeTab == 0 ? "active" : "")" @onclick="() => SwitchTab(0)">
+                <i class="bi bi-hourglass-split me-2"></i>Đơn chờ duyệt
+                @if (_pendingRequests != null && _pendingRequests.Count > 0)
+                {
+                    <span class="badge bg-warning text-dark ms-2">@_pendingRequests.Count</span>
+                }
+            </button>
+            <button class="tab-button @(_activeTab == 1 ? "active" : "")" @onclick="() => SwitchTab(1)">
+                <i class="bi bi-clock-history me-2"></i>Lịch sử đã duyệt
+            </button>
+        </div>
+
+        @* Alert Message *@
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> @_errorMessage
+                <button type="button" class="btn-close btn-close-white" @onclick="() => _errorMessage = null"></button>
+            </div>
+        }
+
+        @* Data Display *@
+        <div class="card-dark-custom shadow-sm">
+            @if (_activeTab == 0)
+            {
+                <div class="section-header-dark py-3 px-4">
+                    <h5 class="section-title m-0">Danh sách đơn chờ phê duyệt</h5>
+                </div>
+                <div class="card-body-dark p-0">
+                    @if (_pendingRequests is null)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="text-muted mt-2">Đang tải danh sách đơn...</p>
+                        </div>
+                    }
+                    else if (_pendingRequests.Count == 0)
+                    {
+                        <div class="text-center py-5 text-muted-dark">
+                            <div class="fs-1 mb-3"><i class="bi bi-inbox-fill"></i></div>
+                            <p>Không có đơn nào đang chờ duyệt.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table-custom">
+                                <thead>
+                                    <tr>
+                                        <th>Nhân viên</th>
+                                        <th>Loại đơn</th>
+                                        <th>Nội dung</th>
+                                        <th>Lý do</th>
+                                        <th>Ngày tạo</th>
+                                        <th class="text-center">Hành động</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in _pendingRequests)
+                                    {
+                                        <tr id="req-@r.Id">
+                                            <td class="fw-semibold text-white">@r.AccountName</td>
+                                            <td>
+                                                <span class="badge-type">@r.RequestTypeName</span>
+                                            </td>
+                                            <td>@r.Summary</td>
+                                            <td class="text-muted-light">@r.Reason</td>
+                                            <td class="time-cell">@r.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td class="text-center">
+                                                <button class="btn btn-sm btn-success-custom me-2"
+                                                        disabled="@_processingIds.Contains(r.Id)"
+                                                        @onclick='() => AskConfirm(r.Id, true, r.AccountName, r.RequestTypeName)'>
+                                                    <i class="bi bi-check2 me-1"></i>Duyệt
+                                                </button>
+                                                <button class="btn btn-sm btn-danger-custom"
+                                                        disabled="@_processingIds.Contains(r.Id)"
+                                                        @onclick='() => AskConfirm(r.Id, false, r.AccountName, r.RequestTypeName)'>
+                                                    <i class="bi bi-x-lg me-1"></i>Từ chối
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="section-header-dark py-3 px-4">
+                    <h5 class="section-title m-0">Lịch sử phê duyệt đơn từ</h5>
+                </div>
+                <div class="card-body-dark p-0">
+                    @if (_historyRequests is null)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="text-muted mt-2">Đang tải lịch sử duyệt...</p>
+                        </div>
+                    }
+                    else if (_historyRequests.Count == 0)
+                    {
+                        <div class="text-center py-5 text-muted-dark">
+                            <div class="fs-1 mb-3"><i class="bi bi-archive-fill"></i></div>
+                            <p>Chưa có lịch sử phê duyệt đơn từ nào.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table-custom">
+                                <thead>
+                                    <tr>
+                                        <th>Nhân viên</th>
+                                        <th>Loại đơn</th>
+                                        <th>Nội dung</th>
+                                        <th>Lý do</th>
+                                        <th>Ngày tạo</th>
+                                        <th class="text-center">Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in _historyRequests)
+                                    {
+                                        <tr id="req-@r.Id">
+                                            <td class="fw-semibold text-white">@r.AccountName</td>
+                                            <td>
+                                                <span class="badge-type">@r.RequestTypeName</span>
+                                            </td>
+                                            <td>@r.Summary</td>
+                                            <td class="text-muted-light">@r.Reason</td>
+                                            <td class="time-cell">@r.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td class="text-center">
+                                                <span class="badge-status @GetStatusClass(r.Status)">
+                                                    @TranslateStatus(r.Status)
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@* Confirmation Modal Dialog *@
+@if (_showConfirmModal)
+{
+    <div class="confirm-modal-backdrop animate-fade-in">
+        <div class="confirm-modal-card">
+            <div class="confirm-modal-header">
+                <h5 class="text-white m-0">Xác nhận hành động</h5>
+                <button type="button" class="btn-close-confirm" @onclick="CancelConfirm">&times;</button>
+            </div>
+            <div class="confirm-modal-body">
+                <p class="text-muted-light">@_confirmMessage</p>
+            </div>
+            <div class="confirm-modal-footer">
+                <button class="btn btn-secondary-custom" @onclick="CancelConfirm">Hủy bỏ</button>
+                <button class="btn @(_isApproveAction ? "btn-success-custom" : "btn-danger-custom")" @onclick="ExecuteConfirmedAction">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private int ApproverAccountId;
+    private bool _accountResolved;
+    private int _activeTab = 0; // 0: pending, 1: history
+
+    private List<RequestListItemDto>? _pendingRequests;
+    private List<RequestListItemDto>? _historyRequests;
+    private readonly HashSet<int> _processingIds = new();
+    private string? _errorMessage;
+
+    private Microsoft.AspNetCore.SignalR.Client.HubConnection? _hubConnection;
+
+    // Confirmation modal state
+    private bool _showConfirmModal = false;
+    private int _targetRequestId;
+    private bool _isApproveAction;
+    private string _confirmMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var idClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(idClaim, out ApproverAccountId))
+        {
+            _errorMessage = "Không xác định được tài khoản đăng nhập. Vui lòng đăng nhập lại.";
+            return;
+        }
+
+        _accountResolved = true;
+
+        await LoadAsync();
+
+        _hubConnection = new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder()
+            .WithUrl(NavManager.ToAbsoluteUri("/hubs/requests"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<RequestListItemDto>("RequestCreated", async (newRequest) =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadAsync();
+                StateHasChanged();
+            });
+        });
+
+        await _hubConnection.StartAsync();
+        await _hubConnection.SendAsync("JoinManagerGroup", ApproverAccountId);
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_activeTab == 0)
+        {
+            _pendingRequests = await RequestService.GetPendingApprovalsAsync(ApproverAccountId);
+        }
+        else
+        {
+            _historyRequests = await RequestService.GetProcessedApprovalsAsync(ApproverAccountId);
+        }
+    }
+
+    private async Task SwitchTab(int tabIndex)
+    {
+        _activeTab = tabIndex;
+        _errorMessage = null;
+        await LoadAsync();
+    }
+
+    private void AskConfirm(int requestId, bool isApprove, string employeeName, string requestType)
+    {
+        _targetRequestId = requestId;
+        _isApproveAction = isApprove;
+        var actionText = isApprove ? "phê duyệt" : "từ chối";
+        _confirmMessage = $"Bạn có chắc chắn muốn {actionText} đơn [{requestType}] của nhân viên [{employeeName}]?";
+        _showConfirmModal = true;
+    }
+
+    private void CancelConfirm()
+    {
+        _showConfirmModal = false;
+    }
+
+    private async Task ExecuteConfirmedAction()
+    {
+        _showConfirmModal = false;
+        if (_isApproveAction)
+        {
+            await Approve(_targetRequestId);
+        }
+        else
+        {
+            await Reject(_targetRequestId);
+        }
+    }
+
+    private async Task Approve(int requestId)
+    {
+        _errorMessage = null;
+        _processingIds.Add(requestId);
+        try
+        {
+            await RequestService.ApproveRequestAsync(requestId, ApproverAccountId);
+            await LoadAsync();
+        }
+        catch (Application.RequestWorkflowException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _processingIds.Remove(requestId);
+        }
+    }
+
+    private async Task Reject(int requestId)
+    {
+        _errorMessage = null;
+        _processingIds.Add(requestId);
+        try
+        {
+            await RequestService.RejectRequestAsync(requestId, ApproverAccountId);
+            await LoadAsync();
+        }
+        catch (Application.RequestWorkflowException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _processingIds.Remove(requestId);
+        }
+    }
+
+    private string TranslateStatus(string status)
+    {
+        return status.ToUpperInvariant() switch
+        {
+            "DRAFT" => "Bản nháp",
+            "PENDING" => "Chờ phê duyệt",
+            "APPROVED" => "Đã phê duyệt",
+            "REJECTED" => "Đã từ chối",
+            "CANCELLED" => "Đã hủy",
+            _ => status
+        };
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status.ToUpperInvariant() switch
+        {
+            "DRAFT" => "badge-status-draft",
+            "PENDING" => "badge-status-pending",
+            "APPROVED" => "badge-status-approved",
+            "REJECTED" => "badge-status-rejected",
+            "CANCELLED" => "badge-status-cancelled",
+            _ => "badge-status-draft"
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+            await _hubConnection.DisposeAsync();
+    }
+}

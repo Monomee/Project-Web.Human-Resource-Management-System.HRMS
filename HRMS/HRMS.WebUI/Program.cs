@@ -1,19 +1,28 @@
-using HRMS.WebUI.Components;
-using HRMS.Infrastructure;
 using HRMS.Application;
+using HRMS.Application.Interfaces;
+using HRMS.Application.Services;
+using HRMS.Infrastructure;
+using HRMS.Infrastructure.Persistence;
+using HRMS.Infrastructure.Services;
+using HRMS.WebUI.Components;
+using HRMS.WebUI.Hubs;
+using HRMS.WebUI.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using HRMS.WebUI.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ----------------------------------------------------------------------------
 // Add services to the container.
+// ----------------------------------------------------------------------------
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddApplicationServices();
+builder.Services.AddRazorPages();
 
-// Cấu hình Cookie Authentication cho Blazor Server
+// Cookie Authentication cho Blazor Server
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -29,27 +38,39 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
-// Đăng ký TempTokenStore dùng để chuyển tiếp Claims từ Interactive Server sang HTTP Endpoint ghi Cookie
+// TempTokenStore: chuyển tiếp Claims từ Interactive Server sang HTTP Endpoint để ghi Cookie
 builder.Services.AddSingleton<TempTokenStore>();
+
+// ----------------------------------------------------------------------------
+// Module Request Workflow (Task 3.2)
+// DB / DbConcurrencyGate / IEmployeeLookup đã được đăng ký sẵn bên trong
+// AddInfrastructureServices() ở trên - chỉ còn thiếu 2 dòng dưới đây.
+// ----------------------------------------------------------------------------
+builder.Services.AddScoped<IRequestService, RequestService>();
+builder.Services.AddScoped<IRequestNotifier, SignalRRequestNotifier>();
+
+builder.Services.AddSignalR();
 
 var app = builder.Build();
 
+// ----------------------------------------------------------------------------
 // Configure the HTTP request pipeline.
+// ----------------------------------------------------------------------------
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
-app.UseAntiforgery();
-
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Endpoint phụ trợ để thực hiện ghi cookie (Do SignalR không hỗ trợ ghi Header trực tiếp)
+// UseAntiforgery() phải đặt SAU UseAuthentication/UseAuthorization theo khuyến nghị của Microsoft
+app.UseAntiforgery();
+
+// Endpoint phụ trợ để ghi Cookie (SignalR/Blazor Server không hỗ trợ ghi Header trực tiếp)
 app.MapGet("/auth/signin", async (string token, TempTokenStore tokenStore, HttpContext httpContext) =>
 {
     var principal = tokenStore.GetAndRemove(token);
@@ -58,7 +79,7 @@ app.MapGet("/auth/signin", async (string token, TempTokenStore tokenStore, HttpC
         return Results.Redirect("/login?error=" + Uri.EscapeDataString("Yêu cầu đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng thử lại."));
     }
 
-    await httpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new Microsoft.AspNetCore.Authentication.AuthenticationProperties
+    await httpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties
     {
         IsPersistent = true,
         ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8),
@@ -68,12 +89,13 @@ app.MapGet("/auth/signin", async (string token, TempTokenStore tokenStore, HttpC
     return Results.Redirect("/");
 });
 
-// Endpoint thực hiện đăng xuất
 app.MapGet("/auth/logout", async (HttpContext httpContext) =>
 {
     await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     return Results.Redirect("/login");
 });
+
+app.MapHub<RequestHub>("/hubs/requests");
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
