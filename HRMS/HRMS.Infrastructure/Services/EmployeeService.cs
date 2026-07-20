@@ -123,7 +123,7 @@ namespace HRMS.Infrastructure.Services
                 newEmployeeCode = $"NV{(lastNumber + 1):D3}";
             }
 
-            // Create User entity
+            // Create User entity only (Account creation is now separate)
             var user = new User
             {
                 EmployeeCode = newEmployeeCode,
@@ -138,25 +138,6 @@ namespace HRMS.Infrastructure.Services
             };
 
             _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            // Create Account for the user
-            var account = new Account
-            {
-                Username = dto.EmailCompany.Split('@')[0], // Use email prefix as username
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password@123"), // Default password
-                Status = true,
-                UserId = user.Id
-            };
-
-            // Add role to account
-            var role = await _context.Roles.FindAsync(dto.RoleId!.Value);
-            if (role != null)
-            {
-                account.Roles.Add(role);
-            }
-
-            _context.Accounts.Add(account);
             await _context.SaveChangesAsync();
 
             // Return EmployeeDto
@@ -183,14 +164,12 @@ namespace HRMS.Infrastructure.Services
         public async Task<bool> UpdateAsync(UpdateEmployeeDto dto)
         {
             var user = await _context.Users
-                .Include(u => u.Account)
-                    .ThenInclude(a => a!.Roles)
                 .FirstOrDefaultAsync(u => u.Id == dto.Id);
 
             if (user == null)
                 return false;
 
-            // Update User fields
+            // Update User fields only (Account updates are now separate)
             user.FullName = dto.FullName;
             user.EmailCompany = dto.EmailCompany;
             user.Phone = dto.Phone;
@@ -199,20 +178,6 @@ namespace HRMS.Infrastructure.Services
             user.PositionId = dto.PositionId!.Value;
             user.DateOfBirth = dto.DateOfBirth;
             user.Status = dto.Status;
-
-            // Update Account Role if account exists and role changed
-            if (user.Account != null && dto.RoleId.HasValue)
-            {
-                // Clear existing roles
-                user.Account.Roles.Clear();
-
-                // Add new role
-                var role = await _context.Roles.FindAsync(dto.RoleId.Value);
-                if (role != null)
-                {
-                    user.Account.Roles.Add(role);
-                }
-            }
 
             await _context.SaveChangesAsync();
             return true;

@@ -137,7 +137,7 @@ public partial class ApplicationDbContext : DbContext, IApplicationDbContext
                 .IsUnicode(false);
             entity.Property(e => e.ContractType)
                 .HasMaxLength(30)
-                .IsUnicode(false);
+                .IsUnicode(true);
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
                 .IsUnicode(false)

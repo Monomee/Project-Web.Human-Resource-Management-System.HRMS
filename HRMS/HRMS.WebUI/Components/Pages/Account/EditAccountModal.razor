@@ -1,0 +1,238 @@
+@using HRMS.Application.DTOs
+
+@if (IsOpen && AccountData != null)
+{
+    <div class="modal fade show d-block modal-backdrop-click" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content-dark">
+                <div class="modal-header-dark">
+                    <h5 class="modal-title">
+                        <i class="bi bi-pencil-fill me-2"></i>Chỉnh sửa tài khoản
+                    </h5>
+                </div>
+                <div class="modal-body-dark">
+                    <EditForm Model="@model" OnValidSubmit="HandleSubmit">
+                        <DataAnnotationsValidator />
+
+                        <div class="row g-3">
+                            <!-- Username -->
+                            <div class="col-md-6">
+                                <label class="form-label-dark">Username <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control-dark" @bind="model.Username" placeholder="username" />
+                            </div>
+
+                            <!-- Status -->
+                            <div class="col-md-6">
+                                <label class="form-label-dark">Trạng thái</label>
+                                <select class="form-control-dark" @bind="model.Status">
+                                    <option value="true">Hoạt động</option>
+                                    <option value="false">Khóa</option>
+                                </select>
+                            </div>
+
+                            <!-- Roles Selection -->
+                            <div class="col-12">
+                                <label class="form-label-dark">Vai trò <span class="text-danger">*</span></label>
+                                <div class="roles-checkbox-group">
+                                    @foreach (var role in Roles)
+                                    {
+                                        <div class="form-check-dark">
+                                            <input class="form-check-input" 
+                                                   type="checkbox" 
+                                                   id="edit-role-@role.Id"
+                                                   checked="@model.RoleIds.Contains(role.Id)"
+                                                   @onchange="e => ToggleRole(role.Id, e)" />
+                                            <label class="form-check-label" for="edit-role-@role.Id">
+                                                @role.Name
+                                            </label>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer-dark mt-4">
+                            <button type="button" class="btn btn-secondary-dark" @onclick="Close">
+                                <i class="bi bi-x-circle me-1"></i>Đóng
+                            </button>
+                            <button type="submit" class="btn btn-primary-dark">
+                                <i class="bi bi-check-circle me-1"></i>Cập nhật
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<UpdateAccountDto> OnSave { get; set; }
+    [Parameter] public UpdateAccountDto? AccountData { get; set; }
+    [Parameter] public List<RoleDto> Roles { get; set; } = new();
+
+    private UpdateAccountDto model = new();
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && AccountData != null)
+        {
+            model = new UpdateAccountDto
+            {
+                Id = AccountData.Id,
+                Username = AccountData.Username,
+                Status = AccountData.Status,
+                RoleIds = new List<int>(AccountData.RoleIds)
+            };
+        }
+    }
+
+    private void ToggleRole(int roleId, ChangeEventArgs e)
+    {
+        bool isChecked = (bool)(e.Value ?? false);
+        if (isChecked)
+        {
+            if (!model.RoleIds.Contains(roleId))
+                model.RoleIds.Add(roleId);
+        }
+        else
+        {
+            model.RoleIds.Remove(roleId);
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(model.Username) || !model.RoleIds.Any())
+        {
+            return;
+        }
+
+        await OnSave.InvokeAsync(model);
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+}
+
+<style>
+    .modal-backdrop-click {
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 1050;
+    }
+
+    .modal-dialog {
+        pointer-events: auto;
+        z-index: 1051;
+    }
+
+    .modal-content-dark {
+        background: #1e293b;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+        pointer-events: auto;
+    }
+
+    .modal-header-dark {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.15) 100%);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 1.25rem 1.5rem;
+    }
+
+    .modal-title {
+        color: #f1f5f9;
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .modal-body-dark {
+        padding: 1.5rem;
+    }
+
+    .form-label-dark {
+        color: #cbd5e1;
+        font-size: 0.9rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control-dark {
+        background: rgba(30, 41, 59, 0.6) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: #e2e8f0 !important;
+        padding: 0.6rem 1rem;
+    }
+
+    .form-control-dark:focus {
+        background: rgba(30, 41, 59, 0.8) !important;
+        border-color: rgba(59, 130, 246, 0.5);
+        box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15);
+    }
+
+    .roles-checkbox-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        padding: 1rem;
+        background: rgba(30, 41, 59, 0.3);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .form-check-dark {
+        display: flex;
+        align-items: center;
+    }
+
+    .form-check-input {
+        background-color: rgba(30, 41, 59, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        cursor: pointer;
+    }
+
+    .form-check-input:checked {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
+    }
+
+    .form-check-label {
+        color: #cbd5e1;
+        margin-left: 0.5rem;
+        cursor: pointer;
+    }
+
+    .modal-footer-dark {
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    .btn-secondary-dark {
+        background: rgba(71, 85, 105, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+        padding: 0.6rem 1.25rem;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    .btn-primary-dark {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        border: none;
+        color: white;
+        padding: 0.6rem 1.25rem;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    .text-danger {
+        color: #ef4444;
+    }
+</style>

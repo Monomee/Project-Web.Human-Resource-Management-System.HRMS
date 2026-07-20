@@ -50,6 +50,9 @@ namespace HRMS.Infrastructure
             // Đăng ký dịch vụ quản lý hợp đồng
             services.AddScoped<IContractService, ContractService>();
 
+            // Đăng ký dịch vụ quản lý tài khoản
+            services.AddScoped<IAccountService, AccountService>();
+
             // Module Request Workflow (Task 3.2) - tra cứu nhân viên/quản lý
             services.AddScoped<IEmployeeLookup, EmployeeLookup>();
 

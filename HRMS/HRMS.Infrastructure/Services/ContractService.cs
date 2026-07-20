@@ -160,15 +160,13 @@ public class ContractService : IContractService
             .OrderBy(t => t)
             .ToListAsync();
 
-        // If no types exist, return default types
+        // If no types exist, return default types (English)
         if (!types.Any())
         {
             return new List<string>
             {
                 "Thử việc",
-                "Có thời hạn (1 năm)",
-                "Có thời hạn (2 năm)",
-                "Có thời hạn (3 năm)",
+                "Có thời hạn",
                 "Không thời hạn"
             };
         }
