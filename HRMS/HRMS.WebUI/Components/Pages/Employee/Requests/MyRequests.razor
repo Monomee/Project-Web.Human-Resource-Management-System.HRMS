@@ -1,139 +1,176 @@
-﻿@page "/requests/my"
+@page "/requests/my"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+
 @using System.Security.Claims
 @using HRMS.Application.DTOs
 @using HRMS.Application.Interfaces
 @using HRMS.Domain.Entities
 @using Microsoft.AspNetCore.SignalR.Client
+
 @inject IRequestService RequestService
 @inject NavigationManager NavManager
 @inject AuthenticationStateProvider AuthStateProvider
 @implements IAsyncDisposable
 
-<PageTitle>Đơn của tôi</PageTitle>
+<PageTitle>Đơn của tôi — HRMS</PageTitle>
 
-<h3>Đơn từ của tôi</h3>
-
-@if (!_accountResolved)
-{
-    <div class="alert alert-danger">@_errorMessage</div>
-}
-else
-{
-
-    <div class="card p-3 mb-4">
-        <h5>Tạo đơn mới</h5>
-
-        @if (_requestTypes is null)
-        {
-            <p>Đang tải danh sách loại đơn...</p>
-        }
-        else
-        {
-            <EditForm Model="_newRequest" OnValidSubmit="HandleSubmit">
-                <div class="mb-2">
-                    <label>Loại đơn</label>
-                    <InputSelect class="form-select" @bind-Value="_newRequest.RequestTypeId">
-                        <option value="0">-- Chọn loại đơn --</option>
-                        @foreach (var t in _requestTypes)
-                        {
-                            <option value="@t.Id">@t.Name</option>
-                        }
-                    </InputSelect>
-                </div>
-
-                @if (SelectedTypeCode == RequestTypeCodes.Leave)
-                {
-                    <div class="row mb-2">
-                        <div class="col">
-                            <label>Từ ngày</label>
-                            <InputDate class="form-control" @bind-Value="_leaveStart" />
-                        </div>
-                        <div class="col">
-                            <label>Đến ngày</label>
-                            <InputDate class="form-control" @bind-Value="_leaveEnd" />
-                        </div>
-                    </div>
-                }
-                else if (SelectedTypeCode == RequestTypeCodes.Overtime)
-                {
-                    <div class="row mb-2">
-                        <div class="col">
-                            <label>Ngày làm OT</label>
-                            <InputDate class="form-control" @bind-Value="_otDate" />
-                        </div>
-                        <div class="col">
-                            <label>Số giờ OT</label>
-                            <InputNumber class="form-control" @bind-Value="_newRequest.OvertimeHours" />
-                        </div>
-                    </div>
-                }
-                else if (SelectedTypeCode == RequestTypeCodes.Complaint)
-                {
-                    <div class="row mb-2">
-                        <div class="col">
-                            <label>Ngày công cần khiếu nại</label>
-                            <InputDate class="form-control" @bind-Value="_complaintDate" />
-                        </div>
-                        <div class="col">
-                            <label>Số giờ đề nghị</label>
-                            <InputNumber class="form-control" @bind-Value="_newRequest.ComplaintProposedHours" />
-                        </div>
-                    </div>
-                }
-
-                <div class="mb-2">
-                    <label>Lý do / Ghi chú</label>
-                    <InputTextArea class="form-control" @bind-Value="_newRequest.Reason" />
-                </div>
-
-                @if (!string.IsNullOrEmpty(_errorMessage))
-                {
-                    <div class="alert alert-danger">@_errorMessage</div>
-                }
-
-                <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
-                    @(_isSubmitting ? "Đang gửi..." : "Gửi đơn")
-                </button>
-            </EditForm>
-        }
+<div class="my-requests-page animate-fade-in">
+    @* Page Header *@
+    <div class="page-header mb-4">
+        <div class="page-header-icon"><i class="bi bi-file-earmark-plus fs-3"></i></div>
+        <div>
+            <h1 class="page-title text-white">Đơn từ của tôi</h1>
+            <p class="page-subtitle text-muted-light">Tạo và theo dõi các đơn xin nghỉ phép, làm thêm giờ hoặc khiếu nại công.</p>
+        </div>
     </div>
 
-    <h5>Lịch sử đơn</h5>
-
-    @if (_myRequests is null)
+    @if (!_accountResolved)
     {
-        <p>Đang tải...</p>
-    }
-    else if (_myRequests.Count == 0)
-    {
-        <p class="text-muted">Chưa có đơn nào.</p>
+        <div class="alert alert-danger-custom mb-4">@_errorMessage</div>
     }
     else
     {
-        <table class="table table-striped align-middle">
-            <thead>
-                <tr>
-                    <th>Loại đơn</th>
-                    <th>Nội dung</th>
-                    <th>Trạng thái</th>
-                    <th>Ngày tạo</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var r in _myRequests)
+        @* Form Section *@
+        <div class="card-dark-custom mb-5 shadow-sm">
+            <div class="section-header-dark py-3 px-4">
+                <h5 class="section-title m-0"><i class="bi bi-pencil-square me-2 text-primary"></i>Tạo đơn mới</h5>
+            </div>
+            <div class="card-body-dark p-4">
+                @if (_requestTypes is null)
                 {
-                    <tr>
-                        <td>@r.RequestTypeName</td>
-                        <td>@r.Summary</td>
-                        <td><span class="badge @GetStatusBadgeClass(r.Status)">@GetStatusLabel(r.Status)</span></td>
-                        <td>@r.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
-                    </tr>
+                    <p class="text-muted">Đang tải danh sách loại đơn...</p>
                 }
-            </tbody>
-        </table>
+                else
+                {
+                    <EditForm Model="_newRequest" OnValidSubmit="HandleSubmit">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label-custom mb-2 d-block">Loại đơn</label>
+                            <InputSelect class="form-select-custom" @bind-Value="_newRequest.RequestTypeId">
+                                <option value="0">-- Chọn loại đơn --</option>
+                                @foreach (var t in _requestTypes)
+                                {
+                                    <option value="@t.Id">@t.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        @if (SelectedTypeCode == RequestTypeCodes.Leave)
+                        {
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label-custom mb-2 d-block">Từ ngày</label>
+                                    <InputDate class="form-control-custom" @bind-Value="_leaveStart" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label-custom mb-2 d-block">Đến ngày</label>
+                                    <InputDate class="form-control-custom" @bind-Value="_leaveEnd" />
+                                </div>
+                            </div>
+                        }
+                        else if (SelectedTypeCode == RequestTypeCodes.Overtime)
+                        {
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label-custom mb-2 d-block">Ngày làm OT</label>
+                                    <InputDate class="form-control-custom" @bind-Value="_otDate" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label-custom mb-2 d-block">Số giờ OT</label>
+                                    <InputNumber class="form-control-custom" @bind-Value="_newRequest.OvertimeHours" />
+                                </div>
+                            </div>
+                        }
+                        else if (SelectedTypeCode == RequestTypeCodes.Complaint)
+                        {
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label-custom mb-2 d-block">Ngày công cần khiếu nại</label>
+                                    <InputDate class="form-control-custom" @bind-Value="_complaintDate" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label-custom mb-2 d-block">Số giờ đề nghị</label>
+                                    <InputNumber class="form-control-custom" @bind-Value="_newRequest.ComplaintProposedHours" />
+                                </div>
+                            </div>
+                        }
+
+                        <div class="mb-4">
+                            <label class="form-label-custom mb-2 d-block">Lý do / Ghi chú</label>
+                            <InputTextArea class="form-control-custom" rows="3" placeholder="Nhập lý do chi tiết..." @bind-Value="_newRequest.Reason" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_errorMessage))
+                        {
+                            <div class="alert alert-danger-custom mb-3">@_errorMessage</div>
+                        }
+
+                        <button type="submit" class="btn-primary-custom" disabled="@_isSubmitting">
+                            @(_isSubmitting ? "Đang gửi..." : "Gửi đơn")
+                        </button>
+                    </EditForm>
+                }
+            </div>
+        </div>
+
+        @* Table Section *@
+        <div class="card-dark-custom shadow-sm">
+            <div class="section-header-dark py-3 px-4">
+                <h5 class="section-title m-0"><i class="bi bi-clock-history me-2 text-primary"></i>Lịch sử đơn từ</h5>
+            </div>
+            <div class="card-body-dark p-0">
+                @if (_myRequests is null)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="text-muted mt-2">Đang tải lịch sử đơn...</p>
+                    </div>
+                }
+                else if (_myRequests.Count == 0)
+                {
+                    <div class="text-center py-5 text-muted-dark">
+                        <div class="fs-1 mb-3"><i class="bi bi-inbox-fill"></i></div>
+                        <p>Chưa có đơn nào được tạo.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table-custom">
+                            <thead>
+                                <tr>
+                                    <th>Loại đơn</th>
+                                    <th>Nội dung</th>
+                                    <th class="text-center">Trạng thái</th>
+                                    <th>Ngày tạo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var r in _myRequests)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold text-white">@r.RequestTypeName</td>
+                                        <td>@r.Summary</td>
+                                        <td class="text-center">
+                                            <span class="badge-status @GetStatusBadgeClass(r.Status)">
+                                                @GetStatusLabel(r.Status)
+                                            </span>
+                                        </td>
+                                        <td class="text-muted-light" style="font-family: monospace; font-size: 0.85rem;">
+                                            @r.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
     }
-}
+</div>
 
 @code {
     private int AccountId;
@@ -223,24 +260,24 @@ else
         }
     }
 
-    private static string GetStatusLabel(string status) => status switch
+    private static string GetStatusLabel(string status) => status.ToUpperInvariant() switch
     {
-        RequestStatuses.Draft => "Nháp",
-        RequestStatuses.Pending => "Chờ duyệt",
-        RequestStatuses.Approved => "Đã duyệt",
-        RequestStatuses.Rejected => "Từ chối",
-        RequestStatuses.Cancelled => "Đã huỷ",
+        "DRAFT" => "Bản nháp",
+        "PENDING" => "Chờ phê duyệt",
+        "APPROVED" => "Đã phê duyệt",
+        "REJECTED" => "Đã từ chối",
+        "CANCELLED" => "Đã hủy",
         _ => status
     };
 
-    private static string GetStatusBadgeClass(string status) => status switch
+    private static string GetStatusBadgeClass(string status) => status.ToUpperInvariant() switch
     {
-        RequestStatuses.Draft => "bg-secondary",
-        RequestStatuses.Pending => "bg-warning text-dark",
-        RequestStatuses.Approved => "bg-success",
-        RequestStatuses.Rejected => "bg-danger",
-        RequestStatuses.Cancelled => "bg-dark",
-        _ => "bg-light text-dark"
+        "DRAFT" => "badge-status-draft",
+        "PENDING" => "badge-status-pending",
+        "APPROVED" => "badge-status-approved",
+        "REJECTED" => "badge-status-rejected",
+        "CANCELLED" => "badge-status-cancelled",
+        _ => "badge-status-draft"
     };
 
     public async ValueTask DisposeAsync()

@@ -1,0 +1,309 @@
+.my-payslip-page {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    color: #f1f5f9;
+    margin-top: 1.5rem;
+}
+
+.page-header {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    background: rgba(30, 41, 59, 0.4);
+    padding: 1.5rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.page-header-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #a855f7, #6b21a8);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.page-subtitle {
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.text-muted-light {
+    color: #94a3b8 !important;
+}
+
+/* Card Dark Custom */
+.card-dark-custom {
+    background: rgba(20, 23, 38, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.card-body-dark {
+    color: #e2e8f0;
+}
+
+/* Form Custom Dropdown */
+.form-select-custom {
+    width: 100%;
+    background-color: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #f1f5f9;
+    padding: 0.625rem 1rem;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.form-select-custom:focus {
+    border-color: #a855f7;
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.25);
+}
+
+/* Print Button Custom */
+.btn-print-custom {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #e2e8f0;
+    padding: 0.65rem 1.25rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-print-custom:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+/* Document Wrapper */
+.payslip-document-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 3rem;
+}
+
+.payslip-card {
+    background: rgba(20, 23, 38, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 3rem;
+    width: 100%;
+    max-width: 800px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.header-divider {
+    border-color: rgba(255, 255, 255, 0.15);
+    margin: 1rem 0;
+}
+
+.payslip-period-date {
+    font-style: italic;
+}
+
+/* Section styling */
+.payslip-section {
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+    padding-bottom: 1.5rem;
+}
+
+.section-heading {
+    font-size: 1rem;
+    color: #f1f5f9;
+    font-weight: 700;
+    border-left: 3px solid #a855f7;
+    padding-left: 0.75rem;
+    margin-bottom: 1.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    background: rgba(30, 41, 59, 0.3);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.info-lbl {
+    color: #94a3b8;
+}
+
+.info-val {
+    color: #f8fafc;
+}
+
+.code-val {
+    color: #60a5fa;
+    font-family: monospace;
+}
+
+/* Table styling */
+.payslip-table {
+    color: #e2e8f0;
+    font-size: 0.9rem;
+}
+
+.payslip-table th {
+    color: #94a3b8;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.75rem 0.5rem;
+}
+
+.payslip-table td {
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.text-danger-custom {
+    color: #f87171 !important;
+}
+
+.text-warning-light {
+    color: #fdba74;
+}
+
+/* Summary Box */
+.payslip-summary-box {
+    background: rgba(30, 41, 59, 0.4);
+    padding: 1.5rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.summary-lbl {
+    color: #94a3b8;
+}
+
+.summary-val {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+/* Signature styling */
+.payslip-signatures {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    margin-top: 3rem;
+}
+
+.signature-space {
+    height: 80px;
+}
+
+.text-muted-dark {
+    color: #64748b !important;
+}
+
+.alert-info-dark {
+    background: rgba(30, 41, 59, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: #94a3b8;
+}
+
+/* =========================================================================
+   PRINT STYLESHEET (CSS @media print)
+   ========================================================================= */
+@media print {
+    body {
+        background-color: white !important;
+        color: black !important;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+
+    .my-payslip-page {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .payslip-document-wrapper {
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    .payslip-card {
+        background: white !important;
+        color: black !important;
+        border: 2px solid #000 !important;
+        box-shadow: none !important;
+        padding: 2cm !important;
+        max-width: 100% !important;
+        border-radius: 0 !important;
+    }
+
+    .payslip-title, .company-name, .section-heading, .info-val, .summary-val, .signature-title, .signature-name {
+        color: black !important;
+    }
+
+    .company-address, .payslip-period-date, .info-lbl, .summary-lbl, .payslip-table th {
+        color: #333333 !important;
+    }
+
+    .info-item {
+        background: #f8f9fa !important;
+        border: 1px solid #ddd !important;
+        color: black !important;
+    }
+
+    .payslip-table th {
+        border-bottom: 2px solid black !important;
+    }
+
+    .payslip-table td {
+        border-bottom: 1px solid #eee !important;
+    }
+
+    .payslip-summary-box {
+        background: #f8f9fa !important;
+        border: 1px solid #ccc !important;
+    }
+
+    .text-success, .text-primary, .text-warning-light, .text-danger-custom {
+        color: black !important;
+    }
+
+    .border-secondary {
+        border-color: black !important;
+    }
+
+    /* Tối ưu hóa kích thước trang in */
+    @page {
+        size: A4 portrait;
+        margin: 1.5cm;
+    }
+}
