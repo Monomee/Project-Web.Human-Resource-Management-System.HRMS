@@ -421,11 +421,31 @@
     // ── SỰ KIỆN: HR chọn file ──────────────────────────────────────
     private void OnFileSelected(InputFileChangeEventArgs e)
     {
-        _selectedFile    = e.File;
-        _fileName        = e.File.Name;
         _errorMessage    = null;
         _successMessage  = null;
         _results         = new();
+
+        var file = e.File;
+        if (file == null) return;
+
+        if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            _errorMessage = "Định dạng tệp không hợp lệ. Hệ thống chỉ chấp nhận tệp Excel (.xlsx).";
+            _selectedFile = null;
+            _fileName = null;
+            return;
+        }
+
+        if (file.Size > 10 * 1024 * 1024)
+        {
+            _errorMessage = "Dung lượng tệp vượt quá giới hạn cho phép (Tối đa 10MB).";
+            _selectedFile = null;
+            _fileName = null;
+            return;
+        }
+
+        _selectedFile    = file;
+        _fileName        = file.Name;
     }
 
     // ── XỬ LÝ FILE: parse → tính công → lưu DB ────────────────────
@@ -439,6 +459,18 @@
         // Kiểm tra đầu vào
         if (_selectedFile == null)  { _errorMessage = "Vui lòng chọn file Excel."; return; }
         if (_selectedPeriodId == 0) { _errorMessage = "Vui lòng chọn kỳ công.";    return; }
+
+        if (!_selectedFile.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            _errorMessage = "Định dạng tệp không hợp lệ. Hệ thống chỉ chấp nhận tệp Excel (.xlsx).";
+            return;
+        }
+
+        if (_selectedFile.Size > 10 * 1024 * 1024)
+        {
+            _errorMessage = "Dung lượng tệp vượt quá giới hạn cho phép (Tối đa 10MB).";
+            return;
+        }
 
         _isProcessing = true;
         StateHasChanged(); // Cập nhật UI ngay để hiện spinner

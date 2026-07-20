@@ -85,6 +85,17 @@ public class PayrollService : IPayrollService
                 g => g.Sum(r => r.Value)
             );
 
+        // Tính số ngày công chuẩn hành chính (loại trừ các ngày Chủ nhật) trong khoảng thời gian của kỳ công
+        int standardWorkingDays = 0;
+        for (var date = period.StartDate; date <= period.EndDate; date = date.AddDays(1))
+        {
+            if (date.DayOfWeek != DayOfWeek.Sunday)
+            {
+                standardWorkingDays++;
+            }
+        }
+        if (standardWorkingDays <= 0) standardWorkingDays = 26; // Cận dưới an toàn làm giá trị mặc định
+
         var payslips = new List<Payslip>();
 
         foreach (var user in users)
@@ -107,14 +118,14 @@ public class PayrollService : IPayrollService
             otHoursDict.TryGetValue(user.Id, out decimal hOt);
 
             // 6. THỰC HIỆN TÍNH TOÁN
-            // Đơn giá ngày công = BaseSalary / 26
-            decimal dailyRate = Math.Round(baseSalary / 26m, 0, MidpointRounding.AwayFromZero);
+            // Đơn giá ngày công = BaseSalary / StandardWorkingDays
+            decimal dailyRate = Math.Round(baseSalary / (decimal)standardWorkingDays, 0, MidpointRounding.AwayFromZero);
 
             // Lương thực tế theo ngày công = Đơn giá ngày công * (D_actual + D_leave_paid)
             decimal actualDaysSalary = Math.Round(dailyRate * (dActual + dLeavePaid), 0, MidpointRounding.AwayFromZero);
 
-            // Lương một giờ cơ bản = BaseSalary / (26 * 8)
-            decimal hourlyRate = Math.Round(baseSalary / (26m * 8m), 0, MidpointRounding.AwayFromZero);
+            // Lương một giờ cơ bản = BaseSalary / (StandardWorkingDays * 8)
+            decimal hourlyRate = Math.Round(baseSalary / ((decimal)standardWorkingDays * 8m), 0, MidpointRounding.AwayFromZero);
 
             // Tiền lương OT = Giờ OT * Lương một giờ cơ bản * 1.5
             decimal otSalary = Math.Round(hOt * hourlyRate * 1.5m, 0, MidpointRounding.AwayFromZero);
@@ -125,8 +136,10 @@ public class PayrollService : IPayrollService
             // Tổng thu nhập (Gross) = Lương thực tế theo ngày công + Tiền lương OT + Các khoản phụ cấp
             decimal grossAmount = Math.Round(actualDaysSalary + otSalary + allowances, 0, MidpointRounding.AwayFromZero);
 
-            // Khấu trừ bảo hiểm xã hội bắt buộc = BaseSalary * 10.5%
-            decimal insuranceDeduction = Math.Round(baseSalary * 0.105m, 0, MidpointRounding.AwayFromZero);
+            // Khấu trừ bảo hiểm xã hội bắt buộc = BaseSalary * 10.5% (Tối đa tính trên trần 20 lần lương cơ sở: 2,340,000 * 20 = 46,800,000 VNĐ)
+            decimal maxInsuranceBase = 46800000m;
+            decimal insuranceBase = Math.Min(baseSalary, maxInsuranceBase);
+            decimal insuranceDeduction = Math.Round(insuranceBase * 0.105m, 0, MidpointRounding.AwayFromZero);
 
             // Thu nhập chịu thuế TNCN = Gross - Khấu trừ bảo hiểm - 11,000,000
             decimal taxableIncome = grossAmount - insuranceDeduction - 11000000m;
@@ -195,18 +208,29 @@ public class PayrollService : IPayrollService
             payslips.Add(payslip);
         }
 
-        // 8. Lưu dữ liệu (Idempotent: xóa các phiếu lương cũ trước khi lưu mới)
-        var oldPayslips = await _db.Payslips.Where(p => p.PeriodId == periodId).ToListAsync();
-        if (oldPayslips.Any())
+        // Bọc toàn bộ thao tác xoá cũ và chèn mới trong Database Transaction để bảo vệ ghi đè song song
+        using var transaction = await _db.Database.BeginTransactionAsync();
+        try
         {
-            _db.Payslips.RemoveRange(oldPayslips);
+            // 8. Lưu dữ liệu (Idempotent: xóa các phiếu lương cũ trước khi lưu mới)
+            var oldPayslips = await _db.Payslips.Where(p => p.PeriodId == periodId).ToListAsync();
+            if (oldPayslips.Any())
+            {
+                _db.Payslips.RemoveRange(oldPayslips);
+                await _db.SaveChangesAsync();
+            }
+
+            await _db.Payslips.AddRangeAsync(payslips);
             await _db.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+            return true;
         }
-
-        await _db.Payslips.AddRangeAsync(payslips);
-        await _db.SaveChangesAsync();
-
-        return true;
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<List<Payslip>> GetPayslipsByPeriodAsync(int periodId)
