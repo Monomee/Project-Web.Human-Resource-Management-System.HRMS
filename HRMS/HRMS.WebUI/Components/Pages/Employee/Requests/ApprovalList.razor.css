@@ -1,0 +1,287 @@
+.approval-page {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    color: #f1f5f9;
+}
+
+.page-header {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    background: rgba(30, 41, 59, 0.4);
+    padding: 1.5rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+}
+
+.page-header-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.page-subtitle {
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.text-muted-light {
+    color: #94a3b8 !important;
+}
+
+/* Tabs */
+.tabs-container {
+    display: flex;
+    gap: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 0.5rem;
+}
+
+.tab-button {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 0.65rem 1.25rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.tab-button:hover {
+    color: #f1f5f9;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.tab-button.active {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* Card & Table styles */
+.card-dark-custom {
+    background: rgba(20, 23, 38, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    overflow: hidden;
+}
+
+.section-header-dark {
+    background: rgba(30, 41, 59, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+.table-custom {
+    width: 100%;
+    border-collapse: collapse;
+    color: #cbd5e1;
+    font-size: 0.9rem;
+}
+
+.table-custom th {
+    background-color: rgba(30, 41, 59, 0.5);
+    color: #94a3b8;
+    font-weight: 600;
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+}
+
+.table-custom td {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    vertical-align: middle;
+}
+
+.table-custom tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.time-cell {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+/* Buttons */
+.btn-success-custom {
+    background: #10b981;
+    border: none;
+    color: white;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-success-custom:hover {
+    background: #059669;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
+.btn-danger-custom {
+    background: #ef4444;
+    border: none;
+    color: white;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-danger-custom:hover {
+    background: #dc2626;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+.btn-secondary-custom {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #e2e8f0;
+    font-weight: 600;
+}
+
+.btn-secondary-custom:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Badges */
+.badge-type {
+    background: rgba(99, 102, 241, 0.12);
+    color: #818cf8;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.badge-status {
+    display: inline-block;
+    padding: 0.3rem 0.75rem;
+    border-radius: 30px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-status-draft {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.badge-status-pending {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-status-approved {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-status-rejected {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-status-cancelled {
+    background: rgba(71, 85, 105, 0.2);
+    color: #94a3b8;
+    border: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+/* Confirmation Modal */
+.confirm-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+}
+
+.confirm-modal-card {
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+}
+
+.confirm-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.btn-close-confirm {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.btn-close-confirm:hover {
+    color: #f1f5f9;
+}
+
+.confirm-modal-body {
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+}
+
+.confirm-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.text-muted-dark {
+    color: #64748b !important;
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
