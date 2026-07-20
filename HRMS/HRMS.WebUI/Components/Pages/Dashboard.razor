@@ -1,0 +1,199 @@
+@page "/"
+@page "/dashboard"
+@rendermode InteractiveServer
+
+@using HRMS.Application.Interfaces
+@using HRMS.Application.DTOs
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IDashboardService DashboardService
+
+<PageTitle>Dashboard Thống kê — HRMS</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="dashboard-page animate-fade-in">
+            @* Welcome / Header Section *@
+            <div class="dashboard-header mb-4">
+                <div class="welcome-box">
+                    <h1 class="welcome-title text-white">Xin chào, @context.User.Identity?.Name!</h1>
+                    <p class="welcome-subtitle text-muted-light">Chào mừng bạn quay trở lại. Dưới đây là tóm tắt tình hình nhân sự và hoạt động lương của doanh nghiệp.</p>
+                </div>
+                <div class="date-badge">
+                    <span class="bi bi-clock-fill me-2 text-primary"></span>
+                    <span>@DateTime.Now.ToString("dd/MM/yyyy")</span>
+                </div>
+            </div>
+
+            @if (_summary == null)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Đang tải dữ liệu...</span>
+                    </div>
+                    <p class="text-muted mt-2">Đang tải dữ liệu tổng quan...</p>
+                </div>
+            }
+            else
+            {
+                @* Stat Cards Section *@
+                <div class="row g-4 mb-5">
+                    @* Card 1: Active Employees *@
+                    <div class="col-md-4">
+                        <div class="stat-card stat-card-green">
+                            <div class="stat-card-glow"></div>
+                            <div class="stat-card-content">
+                                <div class="stat-icon-wrapper">
+                                    <span class="bi bi-people-fill"></span>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Tổng số nhân sự</span>
+                                    <h2 class="stat-number">@_summary.TotalActiveEmployees</h2>
+                                    <span class="stat-desc text-success-light">Đang hoạt động trong công ty</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Card 2: Pending Requests *@
+                    <div class="col-md-4">
+                        <div class="stat-card stat-card-orange">
+                            <div class="stat-card-glow"></div>
+                            <div class="stat-card-content">
+                                <div class="stat-icon-wrapper">
+                                    <span class="bi bi-file-earmark-text-fill"></span>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Đơn từ chờ duyệt</span>
+                                    <h2 class="stat-number">@_summary.PendingRequestsCount</h2>
+                                    <span class="stat-desc text-warning-light">Đơn từ đang đợi phê duyệt</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Card 3: Latest Payroll Expense *@
+                    <div class="col-md-4">
+                        <div class="stat-card stat-card-blue">
+                            <div class="stat-card-glow"></div>
+                            <div class="stat-card-content">
+                                <div class="stat-icon-wrapper">
+                                    <span class="bi bi-cash-stack"></span>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Quỹ lương kỳ gần nhất</span>
+                                    <h2 class="stat-number">@_summary.LatestPayrollExpense.ToString("N0") <span class="fs-6 fw-normal">đ</span></h2>
+                                    <span class="stat-desc text-info-light">@_summary.LatestPeriodName</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @* Bar Chart Section *@
+                <div class="chart-section card-dark-custom mb-4 shadow-sm">
+                    <div class="section-header-dark py-3 px-4">
+                        <h5 class="section-title m-0">
+                            <i class="bi bi-bar-chart-line-fill me-2 text-primary"></i>
+                            Lịch sử chi trả lương theo các kỳ công
+                        </h5>
+                    </div>
+                    <div class="card-body-dark p-4">
+                        @if (!_summary.MonthlyPayrollHistory.Any())
+                        {
+                            <div class="text-center py-5">
+                                <div class="fs-1 text-muted mb-3"><i class="bi bi-graph-up"></i></div>
+                                <p class="text-muted-dark">Chưa có lịch sử bảng lương chi tiết để thống kê.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="chart-container">
+                                <div class="bar-chart">
+                                    @foreach (var item in _summary.MonthlyPayrollHistory)
+                                    {
+                                        <div class="chart-bar-column">
+                                            <div class="bar-value-label">
+                                                @FormatSalaryAbbr(item.TotalNetSalary)
+                                            </div>
+                                            <div class="bar-track">
+                                                <div class="bar-fill" style="height: @(item.PercentageHeight)%">
+                                                    <div class="bar-tooltip">
+                                                        @item.TotalNetSalary.ToString("N0") VNĐ
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="bar-title-label" title="@item.PeriodName">
+                                                @AbbreviatePeriodName(item.PeriodName)
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="alert alert-warning text-center my-5 py-4 shadow-sm border border-warning border-opacity-25" role="alert">
+            <h4 class="alert-heading mb-3"><i class="bi bi-shield-lock-fill text-warning me-2"></i>Truy cập bị từ chối</h4>
+            <p>Vui lòng đăng nhập vào hệ thống để truy cập Dashboard Thống kê.</p>
+            <hr>
+            <a href="/login" class="btn btn-outline-warning mt-2">Đăng nhập ngay</a>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private DashboardSummaryDto? _summary;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _summary = await DashboardService.GetDashboardSummaryAsync();
+        }
+        catch (Exception ex)
+        {
+            // Thiết lập giá trị mặc định tránh văng lỗi
+            _summary = new DashboardSummaryDto
+            {
+                TotalActiveEmployees = 0,
+                PendingRequestsCount = 0,
+                LatestPayrollExpense = 0m,
+                LatestPeriodName = "Lỗi tải dữ liệu",
+                MonthlyPayrollHistory = new()
+            };
+            Console.WriteLine($"Error loading dashboard summary: {ex.Message}");
+        }
+    }
+
+    private string FormatSalaryAbbr(decimal val)
+    {
+        if (val == 0m) return "0";
+        if (val >= 1000000000m)
+        {
+            return $"{(val / 1000000000m):F1}B";
+        }
+        if (val >= 1000000m)
+        {
+            return $"{(val / 1000000m):F1}M";
+        }
+        if (val >= 1000m)
+        {
+            return $"{(val / 1000m):F0}k";
+        }
+        return val.ToString("N0");
+    }
+
+    private string AbbreviatePeriodName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return string.Empty;
+        // Viết ngắn lại để hiển thị đẹp trên trục X: "Kỳ công Tháng 05/2026" -> "T05/2026"
+        return name.Replace("Kỳ công Tháng ", "T")
+                   .Replace("Kỳ công ", "Kỳ ")
+                   .Replace("Kỳ công tháng ", "T");
+    }
+}

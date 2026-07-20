@@ -56,6 +56,9 @@ namespace HRMS.Infrastructure
             // Module Request Workflow (Task 3.2) - tra cứu nhân viên/quản lý
             services.AddScoped<IEmployeeLookup, EmployeeLookup>();
 
+            // Đăng ký dịch vụ Dashboard thống kê (Task 4.1)
+            services.AddScoped<IDashboardService, DashboardService>();
+
             return services;
         }
     }
