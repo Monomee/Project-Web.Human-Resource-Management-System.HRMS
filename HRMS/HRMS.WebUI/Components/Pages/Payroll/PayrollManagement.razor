@@ -1,0 +1,539 @@
+@page "/payroll/calculate"
+@rendermode InteractiveServer
+
+@using HRMS.Application.Interfaces
+@using HRMS.Domain.Entities
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,HRM")]
+
+@inject IPayrollService PayrollService
+@inject IAttendanceService AttendanceService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Tính toán Lương — HRMS</PageTitle>
+
+<div class="payroll-management-page">
+    @* Page Header *@
+    <div class="page-header mb-4">
+        <div class="page-header-icon"><i class="bi bi-calculator-fill"></i></div>
+        <div>
+            <h1 class="page-title text-white">Tính toán lương hàng tháng</h1>
+            <p class="page-subtitle text-muted-light">Tính lương tự động cho nhân viên dựa trên ngày công thực tế, nghỉ phép, OT, bảo hiểm và thuế.</p>
+        </div>
+    </div>
+
+    @* Control Card *@
+    <div class="card-dark-custom mb-4 shadow-sm">
+        <div class="card-body-dark p-4">
+            <div class="row align-items-end g-3">
+                <div class="col-md-5">
+                    <label class="form-label-custom mb-2 d-block text-light fw-semibold" for="periodSelect">
+                        <i class="bi bi-calendar3 me-2"></i>Chọn Kỳ công tính lương
+                    </label>
+                    <select id="periodSelect" class="form-select-custom" value="@_selectedPeriodId" @onchange="OnPeriodChanged">
+                        <option value="0">-- Chọn kỳ công --</option>
+                        @foreach (var p in _periods)
+                        {
+                            <option value="@p.Id">
+                                @p.Name (@p.StartDate.ToString("dd/MM") – @p.EndDate.ToString("dd/MM/yyyy"))
+                                @(p.IsLocked ? " 🔒 Đã khóa sổ" : " 🔓 Đang mở")
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn-calculate-custom w-100" @onclick="CalculatePayroll" 
+                            disabled="@(!CanCalculate)">
+                        @if (_isCalculating)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Đang tính toán lương...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-cpu-fill me-2"></i>
+                            <span>Tính toán Bảng lương</span>
+                        }
+                    </button>
+                </div>
+                <div class="col-md-3">
+                    @if (_selectedPeriodId > 0 && !IsSelectedPeriodLocked)
+                    {
+                        <div class="alert alert-warning-custom py-2 px-3 m-0 small">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i> Kỳ công chưa khóa sổ. Cần khóa sổ trước khi tính lương.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Alert messages *@
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-4 alert-custom" role="alert">
+            <i class="bi bi-exclamation-octagon-fill me-2"></i> @_errorMessage
+            <button type="button" class="btn-close btn-close-white" @onclick="() => _errorMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-4 alert-custom" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i> @_successMessage
+            <button type="button" class="btn-close btn-close-white" @onclick="() => _successMessage = null"></button>
+        </div>
+    }
+
+    @* Data display *@
+    @if (_selectedPeriodId > 0)
+    {
+        <div class="card-dark-custom shadow-sm">
+            <div class="section-header-dark py-3 px-4 d-flex justify-content-between align-items-center">
+                <div class="section-title">
+                    <i class="bi bi-table me-2 text-primary"></i>
+                    <span>Bảng Lương Tháng - @SelectedPeriodName</span>
+                </div>
+                <div class="badge-contract-count">
+                    <span>Tổng số bản ghi: @_payslips.Count</span>
+                </div>
+            </div>
+            
+            <div class="card-body-dark p-0">
+                @if (_isLoadingPayslips)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Đang tải bảng lương...</span>
+                        </div>
+                        <p class="text-muted mt-2">Đang tải dữ liệu bảng lương...</p>
+                    </div>
+                }
+                else if (!_payslips.Any())
+                {
+                    <div class="text-center py-5">
+                        <div class="fs-1 text-muted mb-3"><i class="bi bi-cash-stack"></i></div>
+                        <p class="text-muted-dark">Chưa có dữ liệu bảng lương được tính cho kỳ này.</p>
+                        @if (CanCalculate)
+                        {
+                            <button class="btn btn-outline-primary btn-sm" @onclick="CalculatePayroll">
+                                <i class="bi bi-play-fill"></i> Tính ngay bây giờ
+                            </button>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive-custom">
+                        <table class="table-custom">
+                            <thead>
+                                <tr>
+                                    <th>Mã NV</th>
+                                    <th>Họ và Tên</th>
+                                    <th>Chức vụ</th>
+                                    <th>Lương cơ bản</th>
+                                    <th>Lương OT</th>
+                                    <th>Gross</th>
+                                    <th>Bảo hiểm (10.5%)</th>
+                                    <th>Thuế TNCN</th>
+                                    <th>Thực nhận (Net)</th>
+                                    <th class="text-center">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var slip in _payslips)
+                                {
+                                    <tr>
+                                        <td class="fw-bold code-cell">@slip.User.EmployeeCode</td>
+                                        <td class="name-cell">@slip.User.FullName</td>
+                                        <td>
+                                            <span class="badge-custom-dept">
+                                                @slip.User.Position?.Name
+                                            </span>
+                                        </td>
+                                        <td class="number-cell">@slip.BaseSalary.ToString("N0") <span class="currency-unit">đ</span></td>
+                                        <td class="number-cell">@slip.OtSalary.ToString("N0") <span class="currency-unit">đ</span></td>
+                                        <td class="number-cell fw-semibold text-primary">@slip.GrossAmount.ToString("N0") <span class="currency-unit">đ</span></td>
+                                        <td class="number-cell text-warning-light">@slip.InsuranceDeduction.ToString("N0") <span class="currency-unit">đ</span></td>
+                                        <td class="number-cell text-warning-light">@slip.TaxDeduction.ToString("N0") <span class="currency-unit">đ</span></td>
+                                        <td class="number-cell fw-bold text-success">@slip.NetAmount.ToString("N0") <span class="currency-unit">đ</span></td>
+                                        <td class="text-center">
+                                            <span class="badge-status @GetStatusClass(slip.Status)">
+                                                @slip.Status
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info-dark p-4 text-center rounded-3">
+            <div class="fs-2 mb-2"><i class="bi bi-info-circle-fill"></i></div>
+            <h5 class="text-light">Vui lòng chọn một kỳ công để xem hoặc tính toán bảng lương.</h5>
+        </div>
+    }
+</div>
+
+<style>
+    .payroll-management-page {
+        font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        color: #f1f5f9;
+        margin-top: 1.5rem;
+    }
+
+    .page-header {
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+        background: rgba(30, 41, 59, 0.4);
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .page-header-icon {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .page-subtitle {
+        font-size: 0.9rem;
+        margin: 0;
+    }
+
+    .text-muted-light {
+        color: #94a3b8 !important;
+    }
+
+    /* Card Dark Custom */
+    .card-dark-custom {
+        background: rgba(20, 23, 38, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        overflow: hidden;
+    }
+
+    .card-body-dark {
+        color: #e2e8f0;
+    }
+
+    .section-header-dark {
+        background: rgba(30, 41, 59, 0.3);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .section-title {
+        color: #f1f5f9;
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+
+    .badge-contract-count {
+        background: rgba(59, 130, 246, 0.15);
+        color: #93c5fd;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        padding: 0.35rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    /* Custom Form Elements */
+    .form-select-custom {
+        width: 100%;
+        background-color: rgba(30, 41, 59, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 8px;
+        color: #f1f5f9;
+        padding: 0.625rem 1rem;
+        transition: all 0.2s ease;
+        outline: none;
+    }
+
+    .form-select-custom:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    }
+
+    /* Calculate Button Custom */
+    .btn-calculate-custom {
+        background: linear-gradient(135deg, #22c55e, #15803d);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.65rem 1.25rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .btn-calculate-custom:hover:not(:disabled) {
+        background: linear-gradient(135deg, #16a34a, #166534);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+    }
+
+    .btn-calculate-custom:disabled {
+        background: rgba(71, 85, 105, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        color: #94a3b8;
+        cursor: not-allowed;
+    }
+
+    /* Tables Custom styling */
+    .table-responsive-custom {
+        overflow-x: auto;
+    }
+
+    .table-custom {
+        width: 100%;
+        border-collapse: collapse;
+        color: #e2e8f0;
+        font-size: 0.9rem;
+    }
+
+    .table-custom th {
+        background-color: rgba(30, 41, 59, 0.5);
+        color: #94a3b8;
+        font-weight: 600;
+        padding: 1rem;
+        text-align: left;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+        white-space: nowrap;
+    }
+
+    .table-custom td {
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        vertical-align: middle;
+    }
+
+    .table-custom tbody tr:hover {
+        background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    .code-cell {
+        color: #60a5fa;
+        font-family: monospace;
+        font-size: 0.95rem;
+    }
+
+    .name-cell {
+        font-weight: 500;
+        color: #f8fafc;
+    }
+
+    .number-cell {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        text-align: right;
+    }
+
+    .currency-unit {
+        color: #64748b;
+        font-size: 0.8rem;
+    }
+
+    .text-warning-light {
+        color: #fdba74;
+    }
+
+    /* Badges */
+    .badge-custom-dept {
+        background: rgba(148, 163, 184, 0.1);
+        color: #cbd5e1;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+
+    .badge-status {
+        display: inline-block;
+        padding: 0.25rem 0.6rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .badge-status-draft {
+        background: rgba(148, 163, 184, 0.15);
+        color: #94a3b8;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+
+    .badge-status-approved {
+        background: rgba(59, 130, 246, 0.15);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .badge-status-paid {
+        background: rgba(34, 197, 94, 0.15);
+        color: #4ade80;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    /* Alerts styling */
+    .alert-custom {
+        background: rgba(30, 41, 59, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #f1f5f9;
+        backdrop-filter: blur(8px);
+    }
+
+    .alert-danger {
+        border-color: rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+        background: rgba(239, 68, 68, 0.1);
+    }
+
+    .alert-success {
+        border-color: rgba(34, 197, 94, 0.3);
+        color: #86efac;
+        background: rgba(34, 197, 94, 0.1);
+    }
+
+    .alert-warning-custom {
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        color: #fcd34d;
+        border-radius: 8px;
+    }
+
+    .alert-info-dark {
+        background: rgba(30, 41, 59, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        color: #94a3b8;
+    }
+</style>
+
+@code {
+    private List<TimesheetPeriodDto> _periods = new();
+    private int _selectedPeriodId = 0;
+    private List<Payslip> _payslips = new();
+    private bool _isCalculating = false;
+    private bool _isLoadingPayslips = false;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    private bool IsSelectedPeriodLocked =>
+        _periods.FirstOrDefault(p => p.Id == _selectedPeriodId)?.IsLocked ?? false;
+
+    private string SelectedPeriodName =>
+        _periods.FirstOrDefault(p => p.Id == _selectedPeriodId)?.Name ?? string.Empty;
+
+    private bool CanCalculate =>
+        _selectedPeriodId > 0 && IsSelectedPeriodLocked && !_isCalculating;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _periods = await AttendanceService.GetPeriodsAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Không thể tải danh sách kỳ công: {ex.Message}";
+        }
+    }
+
+    private async Task OnPeriodChanged(ChangeEventArgs e)
+    {
+        _errorMessage = null;
+        _successMessage = null;
+        if (int.TryParse(e.Value?.ToString(), out var id))
+        {
+            _selectedPeriodId = id;
+            await LoadPayslips();
+        }
+    }
+
+    private async Task LoadPayslips()
+    {
+        if (_selectedPeriodId == 0)
+        {
+            _payslips = new List<Payslip>();
+            return;
+        }
+
+        _isLoadingPayslips = true;
+        StateHasChanged();
+
+        try
+        {
+            _payslips = await PayrollService.GetPayslipsByPeriodAsync(_selectedPeriodId);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Lỗi khi tải dữ liệu lương: {ex.Message}";
+        }
+        finally
+        {
+            _isLoadingPayslips = false;
+        }
+    }
+
+    private async Task CalculatePayroll()
+    {
+        if (!CanCalculate) return;
+
+        _isCalculating = true;
+        _errorMessage = null;
+        _successMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var success = await PayrollService.CalculateMonthlyPayrollAsync(_selectedPeriodId);
+            if (success)
+            {
+                _successMessage = $"Tính toán bảng lương thành công cho kỳ công '{SelectedPeriodName}'.";
+                await LoadPayslips();
+            }
+            else
+            {
+                _errorMessage = "Không thể tính toán lương. Vui lòng kiểm tra lại.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Lỗi khi tính toán lương: {ex.Message}";
+        }
+        finally
+        {
+            _isCalculating = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status.ToLower() switch
+        {
+            "draft" => "badge-status-draft",
+            "approved" => "badge-status-approved",
+            "paid" => "badge-status-paid",
+            _ => "badge-status-draft"
+        };
+    }
+}

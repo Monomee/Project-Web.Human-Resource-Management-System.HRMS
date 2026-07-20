@@ -43,6 +43,9 @@ namespace HRMS.Infrastructure
             // Đăng ký dịch vụ quản lý hợp đồng
             services.AddScoped<IContractService, ContractService>();
 
+            // Đăng ký dịch vụ tính lương (Task 3.4)
+            services.AddScoped<IPayrollService, PayrollService>();
+
             return services;
         }
     }

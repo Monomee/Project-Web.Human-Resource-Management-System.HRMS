@@ -1,0 +1,345 @@
+@page "/payroll/my-payslip"
+@rendermode InteractiveServer
+
+@using HRMS.Application.Interfaces
+@using HRMS.Domain.Entities
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@inject IPayrollService PayrollService
+@inject IAttendanceService AttendanceService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JS
+
+<PageTitle>Phiếu lương của tôi — HRMS</PageTitle>
+
+<div class="my-payslip-page">
+    @* Page Header *@
+    <div class="page-header mb-4 no-print">
+        <div class="page-header-icon"><i class="bi bi-cash-coin"></i></div>
+        <div>
+            <h1 class="page-title text-white">Phiếu lương của tôi</h1>
+            <p class="page-subtitle text-muted-light">Tra cứu, xem chi tiết và in phiếu lương hàng tháng của bạn.</p>
+        </div>
+    </div>
+
+    @* Control Area *@
+    <div class="card-dark-custom mb-4 shadow-sm no-print">
+        <div class="card-body-dark p-4">
+            <div class="row align-items-end g-3">
+                <div class="col-md-6">
+                    <label class="form-label-custom mb-2 d-block text-light fw-semibold" for="periodSelect">
+                        <i class="bi bi-calendar3 me-2"></i>Chọn Kỳ lương cần xem
+                    </label>
+                    <select id="periodSelect" class="form-select-custom" value="@_selectedPeriodId" @onchange="OnPeriodChanged">
+                        <option value="0">-- Chọn kỳ lương --</option>
+                        @foreach (var p in _periods)
+                        {
+                            <option value="@p.Id">
+                                @p.Name (@p.StartDate.ToString("dd/MM") – @p.EndDate.ToString("dd/MM/yyyy"))
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    @if (_payslip != null)
+                    {
+                        <button class="btn-print-custom" @onclick="PrintPayslip">
+                            <i class="bi bi-printer-fill me-2"></i>In Phiếu lương (Ctrl + P)
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Messages *@
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger mb-4 alert-custom no-print" role="alert">
+            <i class="bi bi-exclamation-octagon-fill me-2"></i> @_errorMessage
+        </div>
+    }
+
+    @* Payslip Breakdown Document *@
+    @if (_selectedPeriodId > 0)
+    {
+        @if (_isLoading)
+        {
+            <div class="text-center py-5 no-print">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Đang tải phiếu lương...</span>
+                </div>
+                <p class="text-muted mt-2">Đang tải phiếu lương của bạn...</p>
+            </div>
+        }
+        else if (_payslip == null)
+        {
+            <div class="alert alert-info-dark p-5 text-center rounded-3 no-print">
+                <div class="fs-1 mb-3"><i class="bi bi-file-earmark-x-fill text-muted"></i></div>
+                <h5 class="text-light">Không tìm thấy phiếu lương của bạn trong kỳ này.</h5>
+                <p class="text-muted-dark small mb-0">Bảng lương có thể chưa được tính toán hoặc bạn chưa có hợp đồng lao động hoạt động trong kỳ này.</p>
+            </div>
+        }
+        else
+        {
+            <div class="payslip-document-wrapper">
+                <div class="payslip-card">
+                    @* Company Header *@
+                    <div class="payslip-header text-center">
+                        <h4 class="company-name text-uppercase fw-bold m-0">MONOMEE CORPORATION</h4>
+                        <p class="company-address text-muted small m-1">Tầng 12, Tòa nhà công nghệ cao, Hà Nội, Việt Nam</p>
+                        <hr class="header-divider" />
+                        <h3 class="payslip-title text-uppercase fw-bold my-3 text-light">PHIẾU THANH TOÁN LƯƠNG</h3>
+                        <p class="payslip-period text-primary fw-semibold my-1">Kỳ lương: @_payslip.Period?.Name</p>
+                        <p class="payslip-period-date text-muted-dark small">Thời gian: @_payslip.Period?.StartDate.ToString("dd/MM/yyyy") - @_payslip.Period?.EndDate.ToString("dd/MM/yyyy")</p>
+                    </div>
+
+                    @* Employee Info Section *@
+                    <div class="payslip-section mt-4">
+                        <h5 class="section-heading"><i class="bi bi-person-fill me-2"></i>Thông tin nhân sự</h5>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-lbl">Họ và tên:</span>
+                                <span class="info-val fw-semibold">@_payslip.User?.FullName</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-lbl">Mã nhân viên:</span>
+                                <span class="info-val code-val">@_payslip.User?.EmployeeCode</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-lbl">Phòng ban:</span>
+                                <span class="info-val">@_payslip.User?.Department?.Name</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-lbl">Chức vụ:</span>
+                                <span class="info-val">@_payslip.User?.Position?.Name</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Work Details Section *@
+                    <div class="payslip-section mt-4">
+                        <h5 class="section-heading"><i class="bi bi-briefcase-fill me-2"></i>Chi tiết công & phép</h5>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-lbl">Ngày công thực tế (D_actual):</span>
+                                <span class="info-val">@_payslip.ActualDays.ToString("F1") ngày</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-lbl">Nghỉ phép hưởng lương (D_leave_paid):</span>
+                                <span class="info-val">@_payslip.LeavePaidDays.ToString("F1") ngày</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-lbl">Làm thêm giờ (H_ot):</span>
+                                <span class="info-val">@_payslip.OtHours.ToString("F1") giờ</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-lbl">Công chuẩn quy định:</span>
+                                <span class="info-val">26.0 ngày</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Financial Breakdown Section *@
+                    <div class="payslip-section mt-4">
+                        <h5 class="section-heading"><i class="bi bi-currency-dollar me-2"></i>Chi tiết thu nhập & Khấu trừ</h5>
+                        <div class="table-responsive">
+                            <table class="table payslip-table table-borderless">
+                                <thead>
+                                    <tr>
+                                        <th>Mục chi tiết</th>
+                                        <th class="text-end">Cơ sở tính toán</th>
+                                        <th class="text-end">Khoản cộng (+)</th>
+                                        <th class="text-end">Khoản trừ (-)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @* 1. Lương cơ bản *@
+                                    <tr>
+                                        <td class="fw-semibold">1. Lương hợp đồng (Base Salary)</td>
+                                        <td class="text-end">Hợp đồng active</td>
+                                        <td class="text-end text-success">@_payslip.BaseSalary.ToString("N0") đ</td>
+                                        <td class="text-end">-</td>
+                                    </tr>
+                                    @* 2. Lương thực tế ngày công *@
+                                    <tr>
+                                        <td>2. Lương theo ngày công làm việc & phép</td>
+                                        <td class="text-end">((D_actual + D_leave_paid) / 26) * Lương HĐ</td>
+                                        <td class="text-end text-success">@CalculatedDaysSalary.ToString("N0") đ</td>
+                                        <td class="text-end">-</td>
+                                    </tr>
+                                    @* 3. Lương OT *@
+                                    <tr>
+                                        <td>3. Lương làm thêm giờ (OT)</td>
+                                        <td class="text-end">H_ot * (Lương HĐ / (26*8)) * 1.5</td>
+                                        <td class="text-end text-success">@_payslip.OtSalary.ToString("N0") đ</td>
+                                        <td class="text-end">-</td>
+                                    </tr>
+                                    @* 4. Phụ cấp *@
+                                    <tr>
+                                        <td>4. Phụ cấp và các khoản khác</td>
+                                        <td class="text-end">Cố định</td>
+                                        <td class="text-end text-success">@_payslip.Allowances.ToString("N0") đ</td>
+                                        <td class="text-end">-</td>
+                                    </tr>
+                                    @* 5. Bảo hiểm xã hội bắt buộc *@
+                                    <tr>
+                                        <td class="fw-semibold text-warning-light">5. Khấu trừ BHXH bắt buộc</td>
+                                        <td class="text-end text-muted">Base Salary * 10.5%</td>
+                                        <td class="text-end">-</td>
+                                        <td class="text-end text-danger-custom">@_payslip.InsuranceDeduction.ToString("N0") đ</td>
+                                    </tr>
+                                    @* 6. Thuế TNCN *@
+                                    <tr>
+                                        <td class="fw-semibold text-warning-light">6. Thuế thu nhập cá nhân (TNCN)</td>
+                                        <td class="text-end text-muted">Lũy tiến từng phần</td>
+                                        <td class="text-end">-</td>
+                                        <td class="text-end text-danger-custom">@_payslip.TaxDeduction.ToString("N0") đ</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    @* Summary Box *@
+                    <div class="payslip-summary-box mt-4">
+                        <div class="summary-row">
+                            <span class="summary-lbl fs-6">Tổng thu nhập chịu thuế (Gross):</span>
+                            <span class="summary-val text-primary fs-6">@_payslip.GrossAmount.ToString("N0") đ</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-lbl fs-6">Tổng khoản khấu trừ (BHXH + Thuế):</span>
+                            <span class="summary-val text-danger-custom fs-6">@TotalDeduction.ToString("N0") đ</span>
+                        </div>
+                        <div class="summary-row border-top border-secondary pt-3 mt-2">
+                            <span class="summary-lbl fs-5 fw-bold text-light">Thực nhận chuyển khoản (Net):</span>
+                            <span class="summary-val text-success fs-4 fw-bold">@_payslip.NetAmount.ToString("N0") đ</span>
+                        </div>
+                    </div>
+
+                    @* Signatures *@
+                    <div class="payslip-signatures mt-5">
+                        <div class="signature-block">
+                            <p class="signature-title text-muted small">Người lập phiếu</p>
+                            <div class="signature-space"></div>
+                            <p class="signature-name text-muted-dark small">Phòng nhân sự</p>
+                        </div>
+                        <div class="signature-block text-end">
+                            <p class="signature-title text-muted small">Người nhận phiếu</p>
+                            <div class="signature-space"></div>
+                            <p class="signature-name text-muted-dark small">@_payslip.User?.FullName</p>
+                        </div>
+                    </div>
+
+                    <div class="payslip-footer text-center mt-5 text-muted-dark small no-print">
+                        <i class="bi bi-info-circle me-1"></i>Phiếu lương này được bảo mật thông tin tài chính cá nhân. Vui lòng không chia sẻ rộng rãi.
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="alert alert-info-dark p-4 text-center rounded-3 no-print">
+            <div class="fs-2 mb-2"><i class="bi bi-info-circle-fill"></i></div>
+            <h5 class="text-light">Vui lòng chọn một kỳ công để xem chi tiết phiếu lương của bạn.</h5>
+        </div>
+    }
+</div>
+
+
+
+@code {
+    private List<TimesheetPeriodDto> _periods = new();
+    private int _selectedPeriodId = 0;
+    private Payslip? _payslip = null;
+    private int _accountId = 0;
+    private int _userId = 0;
+    private bool _isLoading = false;
+    private string? _errorMessage;
+
+    // Lương ngày công thực tế (breakdown)
+    private decimal CalculatedDaysSalary
+    {
+        get
+        {
+            if (_payslip == null) return 0m;
+            decimal dailyRate = Math.Round(_payslip.BaseSalary / 26m, 0, MidpointRounding.AwayFromZero);
+            return Math.Round(dailyRate * (_payslip.ActualDays + _payslip.LeavePaidDays), 0, MidpointRounding.AwayFromZero);
+        }
+    }
+
+    private decimal TotalDeduction => _payslip != null ? (_payslip.InsuranceDeduction + _payslip.TaxDeduction) : 0m;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _periods = await AttendanceService.GetPeriodsAsync();
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var nameId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (int.TryParse(nameId, out var accountId))
+                {
+                    _accountId = accountId;
+                    _userId = await PayrollService.GetUserIdByAccountIdAsync(_accountId);
+                }
+            }
+
+            if (_userId == 0)
+            {
+                _errorMessage = "Tài khoản của bạn chưa được liên kết với nhân viên nào trong hệ thống hoặc thông tin đăng nhập không hợp lệ.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Lỗi khi tải thông tin cá nhân: {ex.Message}";
+        }
+    }
+
+    private async Task OnPeriodChanged(ChangeEventArgs e)
+    {
+        _errorMessage = null;
+        if (int.TryParse(e.Value?.ToString(), out var id))
+        {
+            _selectedPeriodId = id;
+            await LoadMyPayslip();
+        }
+    }
+
+    private async Task LoadMyPayslip()
+    {
+        if (_selectedPeriodId == 0 || _userId == 0)
+        {
+            _payslip = null;
+            return;
+        }
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            _payslip = await PayrollService.GetMyPayslipAsync(_selectedPeriodId, _userId);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Có lỗi xảy ra khi tải dữ liệu phiếu lương: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task PrintPayslip()
+    {
+        await JS.InvokeVoidAsync("window.print");
+    }
+}
