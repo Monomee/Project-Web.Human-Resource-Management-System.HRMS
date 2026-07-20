@@ -59,6 +59,10 @@ namespace HRMS.Infrastructure
             // Đăng ký dịch vụ Dashboard thống kê (Task 4.1)
             services.AddScoped<IDashboardService, DashboardService>();
 
+            // Đăng ký dịch vụ quản lý kỳ công (TimesheetPeriod CRU)
+            services.AddScoped<ITimePeriodService, TimePeriodService>();
+
+
             return services;
         }
     }
