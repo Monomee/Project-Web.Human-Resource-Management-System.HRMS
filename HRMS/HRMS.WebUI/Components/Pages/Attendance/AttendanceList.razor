@@ -1,0 +1,421 @@
+@page "/attendance/logs"
+@rendermode InteractiveServer
+
+@*
+    AttendanceList.razor — Xem và Sửa bản ghi chấm công (AttendanceLogs)
+
+    Chức năng:
+      1. Dropdown chọn kỳ công → lọc và hiển thị toàn bộ AttendanceLogs của kỳ đó.
+      2. Đọc tham số Query String `periodId` từ URL (nếu có) để tự động chọn lại đúng kỳ công khi quay lại từ trang Sửa.
+      3. Bảng hiển thị: Mã NV, Tên, Giờ quẹt, Loại (IN/OUT), Nguồn (Excel/Manual).
+      4. Nút Sửa từng dòng (kỳ chưa khóa) → chuyển hướng sang trang sửa riêng biệt: /attendance/logs/edit/{Id}.
+      5. Kỳ đã khóa: Nút sửa bị thay thế bằng gạch ngang.
+*@
+
+@using HRMS.Application.Interfaces
+@using HRMS.Application.DTOs.Attendance
+@using Microsoft.AspNetCore.WebUtilities
+@inject IAttendanceService AttendanceService
+@inject ITimePeriodService TimePeriodService
+@inject NavigationManager Navigation
+
+<PageTitle>Danh sách Chấm công — HRMS</PageTitle>
+
+<div class="al-page">
+
+    @* ── TIÊU ĐỀ ── *@
+    <div class="al-header">
+        <div class="al-header-icon">📋</div>
+        <div class="al-header-text">
+            <h1 class="al-title">Danh sách Chấm công</h1>
+            <p class="al-subtitle">Xem và hiệu chỉnh bản ghi quẹt thẻ theo từng kỳ công.</p>
+        </div>
+    </div>
+
+    @* ── THANH LỌC: chọn kỳ công ── *@
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label class="filter-label" for="periodSelect">📅 Chọn kỳ công</label>
+            <select id="periodSelect" class="filter-select"
+                    value="@_selectedPeriodId"
+                    @onchange="OnPeriodChanged">
+                <option value="0">-- Chọn kỳ công để xem --</option>
+                @foreach (var p in _periods)
+                {
+                    <option value="@p.Id">
+                        @p.Name
+                        (@p.StartDate.ToString("dd/MM") – @p.EndDate.ToString("dd/MM/yyyy"))
+                        @(p.IsLocked ? " 🔒" : "")
+                    </option>
+                }
+            </select>
+        </div>
+
+        @* Hiện thông tin kỳ đang chọn *@
+        @if (_selectedPeriod != null)
+        {
+            <div class="period-info @(_selectedPeriod.IsLocked ? "period-locked" : "period-open")">
+                @if (_selectedPeriod.IsLocked)
+                {
+                    <span>🔒 Kỳ này đã <strong>khóa</strong> — chỉ được xem, không sửa được.</span>
+                }
+                else
+                {
+                    <span>✅ Kỳ này đang <strong>mở</strong> — có thể sửa bản ghi.</span>
+                }
+            </div>
+        }
+    </div>
+
+    @* ── THÔNG BÁO TOÀN TRANG ── *@
+    @if (_flashError != null)
+    {
+        <div class="al-alert alert-error">⚠️ @_flashError</div>
+    }
+
+    @* ── NỘI DUNG CHÍNH ── *@
+    @if (_selectedPeriodId == 0)
+    {
+        <div class="al-placeholder">
+            <span>👆</span>
+            <p>Hãy chọn một kỳ công ở trên để xem danh sách bản ghi chấm công.</p>
+        </div>
+    }
+    else if (_isLoadingLogs)
+    {
+        <div class="al-loading">⏳ Đang tải dữ liệu chấm công...</div>
+    }
+    else if (_logs.Count == 0)
+    {
+        <div class="al-empty">
+            <span>📭</span>
+            <p>Kỳ công này chưa có bản ghi chấm công nào. Hãy import Excel tại trang <a href="/attendance/import">Import Chấm công</a>.</p>
+        </div>
+    }
+    else
+    {
+        @* ── THỐNG KÊ NHANH ── *@
+        <div class="stats-bar">
+            <div class="stat-chip">
+                <span class="stat-icon">📊</span>
+                <span>Tổng bản ghi: <strong>@_logs.Count</strong></span>
+            </div>
+            <div class="stat-chip">
+                <span class="stat-icon">🟢</span>
+                <span>Quẹt vào (IN): <strong>@_logs.Count(l => l.CheckType == "IN")</strong></span>
+            </div>
+            <div class="stat-chip">
+                <span class="stat-icon">🔴</span>
+                <span>Quẹt ra (OUT): <strong>@_logs.Count(l => l.CheckType == "OUT")</strong></span>
+            </div>
+            <div class="stat-chip">
+                <span class="stat-icon">🧑‍💼</span>
+                <span>Số nhân viên: <strong>@_logs.Select(l => l.UserId).Distinct().Count()</strong></span>
+            </div>
+        </div>
+
+        @* ── BẢNG DỮ LIỆU ── *@
+        <div class="al-table-wrapper">
+            <table class="al-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Mã NV</th>
+                        <th>Họ tên</th>
+                        <th>Ngày</th>
+                        <th>Giờ quẹt</th>
+                        <th>Loại</th>
+                        <th>Nguồn</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < _logs.Count; i++)
+                    {
+                        var log = _logs[i];
+                        var rowNum = i + 1;
+                        <tr class="@GetRowClass(log)">
+                            <td class="td-num">@rowNum</td>
+                            <td class="td-code">@log.EmployeeCode</td>
+                            <td>@log.EmployeeName</td>
+                            <td class="td-mono">@log.CheckedAt.ToString("dd/MM/yyyy")</td>
+                            <td class="td-mono">@log.CheckedAt.ToString("HH:mm:ss")</td>
+                            <td class="td-center">
+                                <span class="badge @(log.CheckType == "IN" ? "badge-in" : "badge-out")">
+                                    @log.CheckType
+                                </span>
+                            </td>
+                            <td class="td-center">
+                                <span class="badge @(log.Source == "Manual" ? "badge-manual" : "badge-excel")">
+                                    @log.Source
+                                </span>
+                            </td>
+                            <td class="td-center">
+                                @if (_selectedPeriod?.IsLocked == false)
+                                {
+                                    <a class="btn-icon btn-edit"
+                                       title="Sửa bản ghi này"
+                                       href="/attendance/logs/edit/@log.Id">
+                                        ✏️ Sửa
+                                    </a>
+                                }
+                                else
+                                {
+                                    <span class="locked-hint" title="Kỳ đã khóa, không sửa được">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+</div>
+
+@* ── STYLE ── *@
+<style>
+    .al-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    /* Header */
+    .al-header {
+        display: flex;
+        align-items: center;
+        gap: 1.2rem;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid #e8ecf0;
+    }
+    .al-header-icon { font-size: 2.4rem; }
+    .al-header-text { flex: 1; }
+    .al-title   { font-size: 1.75rem; font-weight: 700; color: white; margin: 0 0 0.2rem 0; }
+    .al-subtitle{ color: white; margin: 0; font-size: 0.93rem; }
+
+    /* Filter bar */
+    .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.1rem 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        flex-wrap: wrap;
+    }
+    .filter-group   { display: flex; flex-direction: column; gap: 0.35rem; }
+    .filter-label   { font-weight: 600; color: #374151; font-size: 0.87rem; }
+    .filter-select  {
+        padding: 0.55rem 0.9rem;
+        border: 1.5px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 0.93rem;
+        color: #374151;
+        background: #f9fafb;
+        min-width: 320px;
+        transition: border-color 0.2s;
+    }
+    .filter-select:focus { outline: none; border-color: #4f7ef7; background: #fff; }
+
+    .period-info {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        align-self: flex-end;
+    }
+    .period-locked { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+    .period-open   { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+
+    /* Alerts */
+    .al-alert {
+        padding: 0.8rem 1.1rem;
+        border-radius: 8px;
+        font-size: 0.92rem;
+        font-weight: 500;
+        margin-bottom: 1.25rem;
+    }
+    .alert-error   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+
+    /* Placeholder / Loading / Empty */
+    .al-placeholder, .al-empty {
+        text-align: center; padding: 5rem 2rem; color: #6b7280;
+    }
+    .al-placeholder span, .al-empty span { font-size: 3rem; display: block; margin-bottom: 0.75rem; }
+    .al-loading { text-align: center; color: #9ca3af; padding: 3rem; }
+
+    /* Stats bar */
+    .stats-bar {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.25rem;
+    }
+    .stat-chip {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.45rem 0.85rem;
+        font-size: 0.87rem;
+        color: #374151;
+    }
+    .stat-icon { font-size: 1rem; }
+
+    /* Table */
+    .al-table-wrapper {
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        overflow-x: auto;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .al-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .al-table thead th {
+        background: #f1f5f9;
+        color: #475569;
+        font-weight: 700;
+        padding: 0.8rem 1rem;
+        text-align: left;
+        border-bottom: 2px solid #e2e8f0;
+        white-space: nowrap;
+    }
+    .al-table tbody tr {transition: background 0.15s; }
+    .al-table tbody tr:hover { background: #f8fafc; }
+    .al-table td {
+        padding: 0.65rem 1rem;
+        border-bottom: 1px solid #f1f5f9;
+        color: #374151;
+        vertical-align: middle;
+    }
+
+    .row-in {
+        background: #ffffff;
+        border-left: 3px solid #22c55e;
+    }
+
+    .row-out {
+        background: #ffffff;
+        border-left: 3px solid #f59e0b;
+    }
+    .row-manual { background: #fffbeb; }
+
+    .td-num    { width: 44px; color: #9ca3af; font-size: 0.8rem; }
+    .td-code   { font-family: monospace; font-weight: 600; font-size: 0.85rem; }
+    .td-mono   { font-family: monospace; font-size: 0.87rem; }
+    .td-center { text-align: center; }
+
+    /* Badges */
+    .badge { display: inline-block; padding: 0.22rem 0.65rem; border-radius: 12px; font-size: 0.78rem; font-weight: 700; }
+    .badge-in     { background: #dcfce7; color: #15803d; }
+    .badge-out    { background: #fef9c3; color: #92400e; }
+    .badge-excel  { background: #eff6ff; color: #1d4ed8; }
+    .badge-manual { background: #fef3c7; color: #b45309; }
+
+    /* Action buttons */
+    .btn-icon {
+        display: inline-block;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #2563eb;
+        cursor: pointer;
+        font-size: 0.8rem;
+        padding: 0.28rem 0.65rem;
+        border-radius: 6px;
+        font-weight: 600;
+        white-space: nowrap;
+        text-decoration: none;
+        transition: background 0.15s;
+    }
+    .btn-icon:hover { background: #dbeafe; }
+    .locked-hint { color: #d1d5db; font-size: 0.85rem; }
+</style>
+
+@code {
+    private List<TimesheetPeriodDto> _periods          = new();
+    private int                       _selectedPeriodId = 0;
+    private TimesheetPeriodDto?        _selectedPeriod   = null;
+    private List<AttendanceLogDto>    _logs             = new();
+    private bool                      _isLoadingLogs    = false;
+    private string?                    _flashError       = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _periods = await TimePeriodService.GetAllAsync();
+    }
+
+    // Tải và parse Query String ở đây
+    protected override async Task OnParametersSetAsync()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("periodId", out var periodIdVal))
+        {
+            if (int.TryParse(periodIdVal, out var parsedId) && parsedId != 0)
+            {
+                _selectedPeriodId = parsedId;
+                _selectedPeriod   = _periods.FirstOrDefault(p => p.Id == _selectedPeriodId);
+
+                _isLoadingLogs = true;
+                try
+                {
+                    _logs = await AttendanceService.GetLogsAsync(_selectedPeriodId);
+                }
+                catch (Exception ex)
+                {
+                    _flashError = $"Lỗi tải dữ liệu: {ex.Message}";
+                }
+                finally
+                {
+                    _isLoadingLogs = false;
+                }
+            }
+        }
+    }
+
+    private async Task OnPeriodChanged(ChangeEventArgs e)
+    {
+        _selectedPeriodId = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+        _logs             = new();
+        _flashError       = null;
+
+        if (_selectedPeriodId == 0)
+        {
+            _selectedPeriod = null;
+            // Xóa query string
+            Navigation.NavigateTo("/attendance/logs");
+            return;
+        }
+
+        _selectedPeriod = _periods.FirstOrDefault(p => p.Id == _selectedPeriodId);
+
+        // Đẩy lên query string để giữ trạng thái URL
+        Navigation.NavigateTo($"/attendance/logs?periodId={_selectedPeriodId}");
+
+        _isLoadingLogs = true;
+        try
+        {
+            _logs = await AttendanceService.GetLogsAsync(_selectedPeriodId);
+        }
+        catch (Exception ex)
+        {
+            _flashError = $"Lỗi tải dữ liệu: {ex.Message}";
+        }
+        finally
+        {
+            _isLoadingLogs = false;
+        }
+    }
+
+    private static string GetRowClass(AttendanceLogDto log)
+    {
+        string cls = log.CheckType == "IN" ? "row-in" : "row-out";
+        if (log.Source == "Manual") cls += " row-manual";
+        return cls;
+    }
+}
