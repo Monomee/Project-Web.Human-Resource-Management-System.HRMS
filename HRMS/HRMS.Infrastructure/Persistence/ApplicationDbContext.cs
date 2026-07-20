@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using HRMS.Domain.Entities;
@@ -88,6 +88,8 @@ public partial class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<AttendanceLog>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Attendan__3214EC07BDED11DB");
+
+            entity.HasIndex(e => new { e.UserId, e.PeriodId }, "IX_AttendanceLogs_UserPeriod");
 
             entity.Property(e => e.CheckType)
                 .HasMaxLength(10)
@@ -218,6 +220,9 @@ public partial class ApplicationDbContext : DbContext, IApplicationDbContext
                 .HasDefaultValue("Pending");
             entity.Property(e => e.Title).HasMaxLength(100);
             entity.Property(e => e.Value).HasColumnType("decimal(5, 1)");
+
+            entity.HasIndex(e => new { e.CurrentApproverAccountId, e.Status }, "IX_Requests_Approver");
+            entity.HasIndex(e => e.CreatedByAccountId, "IX_Requests_Creator");
 
             entity.HasOne(d => d.CreatedByAccount).WithMany(p => p.RequestCreatedByAccounts)
                 .HasForeignKey(d => d.CreatedByAccountId)

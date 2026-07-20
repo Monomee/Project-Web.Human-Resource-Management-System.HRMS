@@ -144,12 +144,11 @@ namespace HRMS.Infrastructure.Services
             var account = new Account
             {
                 Username = dto.EmailCompany.Split('@')[0], // Use email prefix as username
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password@123"), // Default password
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123"), // Default password
                 Status = true,
                 UserId = user.Id
             };
 
-            // Add role to account
             var role = await _context.Roles.FindAsync(dto.RoleId!.Value);
             if (role != null)
             {

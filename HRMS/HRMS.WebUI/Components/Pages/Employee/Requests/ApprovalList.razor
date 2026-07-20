@@ -11,6 +11,7 @@
 @inject IRequestService RequestService
 @inject NavigationManager NavManager
 @inject AuthenticationStateProvider AuthStateProvider
+@inject HRMS.WebUI.Services.TempTokenStore TokenStore
 @implements IAsyncDisposable
 
 <PageTitle>Phê duyệt Đơn từ — HRMS</PageTitle>
@@ -239,8 +240,10 @@
 
         await LoadAsync();
 
+        var tempToken = TokenStore.GenerateToken(authState.User);
+
         _hubConnection = new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder()
-            .WithUrl(NavManager.ToAbsoluteUri("/hubs/requests"))
+            .WithUrl(NavManager.ToAbsoluteUri($"/hubs/requests?token={tempToken}"))
             .WithAutomaticReconnect()
             .Build();
 
@@ -254,7 +257,7 @@
         });
 
         await _hubConnection.StartAsync();
-        await _hubConnection.SendAsync("JoinManagerGroup", ApproverAccountId);
+        await _hubConnection.SendAsync("JoinManagerGroup");
     }
 
     private async Task LoadAsync()

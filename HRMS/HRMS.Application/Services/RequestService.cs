@@ -125,9 +125,17 @@ namespace HRMS.Application.Services
                 .FirstOrDefaultAsync(b => b.UserId == userId && b.Year == year)
                 ?? throw new RequestWorkflowException($"Không tìm thấy dữ liệu phép năm {year} cho nhân viên này.");
 
-            if (balance.RemainingDays < requestedDays)
+            var pendingDays = await _db.Requests
+                .Where(r => r.CreatedByAccountId == model.AccountId 
+                            && r.Status == RequestStatuses.Pending 
+                            && r.RequestType.Code == RequestTypeCodes.Leave
+                            && r.StartDate.Year == year)
+                .SumAsync(r => r.Value);
+
+            var availableDays = balance.RemainingDays - pendingDays;
+            if (availableDays < requestedDays)
                 throw new RequestWorkflowException(
-                    $"Không đủ số ngày phép còn lại. Còn {balance.RemainingDays} ngày, yêu cầu {requestedDays} ngày.");
+                    $"Không đủ số ngày phép khả dụng. Bạn còn {balance.RemainingDays} ngày phép, nhưng có {pendingDays} ngày đang chờ phê duyệt. Số ngày khả dụng thực tế hiện tại là {availableDays} ngày.");
 
             return (start.ToDateTime(TimeOnly.MinValue), end.ToDateTime(TimeOnly.MinValue), requestedDays);
         }
