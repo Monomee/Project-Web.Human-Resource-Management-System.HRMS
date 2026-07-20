@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HRMS.Domain.Entities;
@@ -32,4 +32,13 @@ public partial class Payslip
     public virtual TimesheetPeriod Period { get; set; } = null!;
 
     public virtual User User { get; set; } = null!;
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public decimal ActualDays { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public decimal LeavePaidDays { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public decimal OtHours { get; set; }
 }
