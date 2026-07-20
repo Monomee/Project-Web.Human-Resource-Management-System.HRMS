@@ -15,6 +15,7 @@
     <Folder Include="Features\Attendance\" />
     <Folder Include="Features\Requests\" />
     <Folder Include="Features\Payroll\" />
+	<Folder Include="Interfaces\" />
   </ItemGroup>
 
   <ItemGroup>

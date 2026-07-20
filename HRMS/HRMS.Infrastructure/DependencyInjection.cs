@@ -53,6 +53,10 @@ namespace HRMS.Infrastructure
             // Module Request Workflow (Task 3.2) - tra cứu nhân viên/quản lý
             services.AddScoped<IEmployeeLookup, EmployeeLookup>();
 
+            // Đăng ký dịch vụ quản lý kỳ công (TimesheetPeriod CRU)
+            services.AddScoped<ITimePeriodService, TimePeriodService>();
+
+
             return services;
         }
     }
