@@ -1,11 +1,7 @@
 @page "/accounts"
 @rendermode InteractiveServer
-@using HRMS.Application.Interfaces
-@using HRMS.Application.DTOs
-@using HRMS.Domain.Exceptions
-@using HRMS.WebUI.Components.Pages.Account
 @inject IAccountService AccountService
-@inject IEmployeeService EmployeeService
+@inject IEmployeeService EmployeeService  
 @inject IRoleService RoleService
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,HRM,HR")]
 
@@ -14,769 +10,132 @@
 <div class="container-fluid mt-4">
     <div class="row mb-4">
         <div class="col">
-            <h2 class="page-title">
+            <h2 style="color: #f1f5f9; font-size: 1.75rem; font-weight: 600;">
                 <i class="bi bi-person-badge-fill me-2"></i>Quản lý Tài khoản
             </h2>
-            <p class="page-subtitle">Quản lý thông tin đăng nhập và phân quyền người dùng</p>
+            <p style="color: #94a3b8; font-size: 0.95rem;">Quản lý thông tin đăng nhập và phân quyền người dùng</p>
         </div>
     </div>
 
     @if (accounts == null)
     {
         <div class="text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Đang tải...</span>
-            </div>
-            <p class="mt-3 text-muted-light">Đang tải dữ liệu...</p>
-        </div>
-    }
-    else if (!accounts.Any())
-    {
-        <div class="alert alert-info-dark">
-            <i class="bi bi-info-circle me-2"></i>Chưa có tài khoản nào trong hệ thống.
+            <div class="spinner-border text-primary"></div>
+            <p class="mt-3" style="color: #94a3b8;">Đang tải dữ liệu...</p>
         </div>
     }
     else
     {
-        <!-- Table Toolbar -->
-        <div class="table-toolbar mb-3">
-            <div class="toolbar-left">
-                <div class="search-box">
-                    <i class="bi bi-search search-icon"></i>
-                    <input type="text"
-                           class="form-control search-input"
-                           placeholder="Tìm kiếm tài khoản (Username, Tên, Mã NV)"
-                           @bind="searchKeyword"
-                           @bind:event="oninput"
-                           @onkeyup="ApplyFilters" />
-                
-                    @if (!string.IsNullOrEmpty(searchKeyword))
-                    {
-                        <button class="btn-clear-search" @onclick="ClearSearch">
-                            <i class="bi bi-x-circle-fill"></i>
-                        </button>
-                    }
+        <div class="card" style="background: rgba(20, 23, 38, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;">
+            <div class="card-body">
+                <div class="mb-3">
+                    <button class="btn btn-primary" @onclick="ShowCreateModal">
+                        <i class="bi bi-plus-circle me-2"></i>Thêm tài khoản mới
+                    </button>
                 </div>
-            </div>
-
-            <div class="toolbar-right">
-                <button class="btn-add-new" @onclick="AddNewAccount">
-                    <i class="bi bi-plus-circle me-2"></i>Thêm tài khoản mới
-                </button>
-            </div>
-        </div>
-
-        <div class="card-dark">
-            <div class="table-responsive">
-                <table class="table-dark-custom">
-                    <thead>
-                        <tr>
-                            <th style="width: 180px">Username</th>
-                            <th style="width: 240px">Nhân viên</th>
-                            <th style="width: 120px">Mã NV</th>
-                            <th style="width: 220px">Email</th>
-                            <th style="width: 180px">Vai trò</th>
-                            <th style="width: 120px" class="text-center">Trạng thái</th>
-                            <th style="width: 140px" class="text-center">Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var acc in GetPaginatedAccounts())
-                        {
+                
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
                             <tr>
-                                <td><span class="username-text">@acc.Username</span></td>
-                                <td><span class="employee-name-text">@acc.FullName</span></td>
-                                <td><span class="employee-code-text">@acc.EmployeeCode</span></td>
-                                <td><span class="email-text">@acc.EmailCompany</span></td>
-                                <td>
-                                    @foreach (var role in acc.RoleNames)
-                                    {
-                                        <span class="badge-dark badge-role me-1">
-                                            <i class="bi bi-shield-fill-check me-1"></i>@role
-                                        </span>
-                                    }
-                                </td>
-                                <td class="text-center">
-                                    @if (acc.Status)
-                                    {
-                                        <span class="badge-dark badge-active">
-                                            <i class="bi bi-check-circle-fill me-1"></i>Hoạt động
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge-dark badge-inactive">
-                                            <i class="bi bi-dash-circle-fill me-1"></i>Khóa
-                                        </span>
-                                    }
-                                </td>
-                                <td class="text-center">
-                                    <div class="action-icons">
-                                        <button class="icon-btn icon-edit"
-                                                @onclick="() => EditAccount(acc.Id)"
-                                                title="Chỉnh sửa">
+                                <th>Username</th>
+                                <th>Nhân viên</th>
+                                <th>Mã NV</th>
+                                <th>Email</th>
+                                <th>Vai trò</th>
+                                <th>Trạng thái</th>
+                                <th class="text-center">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var acc in accounts)
+                            {
+                                <tr>
+                                    <td style="color: #60a5fa; font-weight: 500;">@acc.Username</td>
+                                    <td style="color: #e2e8f0;">@acc.FullName</td>
+                                    <td style="color: #94a3b8; font-family: monospace;">@acc.EmployeeCode</td>
+                                    <td style="color: #94a3b8; font-size: 0.9rem;">@acc.EmailCompany</td>
+                                    <td>
+                                        @foreach (var role in acc.RoleNames)
+                                        {
+                                            <span class="badge bg-purple me-1">@role</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (acc.Status)
+                                        {
+                                            <span class="badge bg-success">Hoạt động</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger">Khóa</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-info me-1" @onclick="() => EditAccount(acc.Id)" title="Sửa">
                                             <i class="bi bi-pencil-fill"></i>
                                         </button>
-                                        <button class="icon-btn icon-key"
-                                                @onclick="() => ChangePassword(acc.Id)"
-                                                title="Đổi mật khẩu">
+                                        <button class="btn btn-sm btn-warning me-1" @onclick="() => ChangePassword(acc.Id)" title="Đổi MK">
                                             <i class="bi bi-key-fill"></i>
                                         </button>
-                                        <button class="icon-btn icon-delete"
-                                                @onclick="() => DeleteAccount(acc.Id)"
-                                                title="Xóa">
+                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteAccount(acc.Id)" title="Xóa">
                                             <i class="bi bi-trash-fill"></i>
                                         </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-
-        <!-- Pagination -->
-        @if (GetTotalCount() > 0)
-        {
-            <div class="pagination-wrapper">
-                <div class="pagination-left">
-                    <span class="pagination-text">
-                        Hiển thị @GetStartIndex() đến @GetEndIndex() trên tổng số @GetTotalCount() tài khoản
-                    </span>
-                </div>
-                <div class="pagination-controls">
-                    <button class="pagination-btn" @onclick="FirstPage" disabled="@(currentPage == 1)">
-                        <i class="bi bi-chevron-double-left"></i>
-                    </button>
-                    <button class="pagination-btn" @onclick="PreviousPage" disabled="@(currentPage == 1)">
-                        <i class="bi bi-chevron-left"></i>
-                    </button>
-                    <span class="pagination-text">Trang @currentPage / @totalPages</span>
-                    <button class="pagination-btn" @onclick="NextPage" disabled="@(currentPage == totalPages)">
-                        <i class="bi bi-chevron-right"></i>
-                    </button>
-                    <button class="pagination-btn" @onclick="LastPage" disabled="@(currentPage == totalPages)">
-                        <i class="bi bi-chevron-double-right"></i>
-                    </button>
-                </div>
-            </div>
-        }
 
         @if (!string.IsNullOrEmpty(message))
         {
-            <div class="alert @alertClass mt-3">
-                <i class="bi @(alertClass == "alert-success-dark" ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i>
-                @message
-            </div>
+            <div class="alert alert-@alertClass mt-3">@message</div>
         }
     }
 </div>
 
-<!-- Create Account Modal -->
-<CreateAccountModal
-    IsOpen="@isCreateModalOpen"
-    OnClose="@CloseCreateModal"
-    OnSave="@HandleCreateAccount"
-    Employees="@employeeList"
-    Roles="@roleList" />
-
-<!-- Edit Account Modal -->
-<EditAccountModal
-    IsOpen="@isEditModalOpen"
-    OnClose="@CloseEditModal"
-    OnSave="@HandleUpdateAccount"
-    AccountData="@selectedAccount"
-    Roles="@roleList" />
-
-<!-- Change Password Modal -->
-<ChangePasswordModal
-    IsOpen="@isChangePasswordModalOpen"
-    OnClose="@CloseChangePasswordModal"
-    OnSave="@HandleChangePassword"
-    AccountId="@selectedAccountId" />
-
-<!-- Delete Confirmation Modal -->
-@if (showDeleteModal)
-{
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7); z-index: 1050;">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content-dark">
-                <div class="modal-header-dark bg-danger">
-                    <h5 class="modal-title">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Xác nhận xóa
-                    </h5>
-                </div>
-                <div class="modal-body-dark">
-                    <p>Bạn có chắc chắn muốn xóa tài khoản này?</p>
-                    <p class="text-danger mb-0">Hành động này không thể hoàn tác!</p>
-                </div>
-                <div class="modal-footer-dark">
-                    <button type="button" class="btn btn-secondary-dark" @onclick="CloseDeleteModal">Hủy</button>
-                    <button type="button" class="btn btn-danger-dark" @onclick="ConfirmDelete">Xóa</button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
-<!-- Business Error Modal -->
-@if (showBusinessErrorModal)
-{
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7); z-index: 1050;">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content-dark">
-                <div class="modal-header-dark bg-danger">
-                    <h5 class="modal-title">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Lỗi
-                    </h5>
-                </div>
-                <div class="modal-body-dark">
-                    <p class="mb-0">@businessErrorMessage</p>
-                </div>
-                <div class="modal-footer-dark">
-                    <button type="button" class="btn btn-secondary-dark" @onclick="CloseBusinessErrorModal">Đóng</button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
 @code {
     private List<AccountDto>? accounts;
-    private string searchKeyword = string.Empty;
-
-    // Pagination
-    private int currentPage = 1;
-    private int pageSize = 10;
-    private int totalPages => (int)Math.Ceiling((double)GetFilteredAccounts().Count() / pageSize);
-
     private string message = string.Empty;
-    private string alertClass = string.Empty;
-    private bool showBusinessErrorModal = false;
-    private string businessErrorMessage = string.Empty;
-    private bool showDeleteModal = false;
-    private int deleteAccountId = 0;
-
-    // Modal states
-    private bool isCreateModalOpen = false;
-    private bool isEditModalOpen = false;
-    private bool isChangePasswordModalOpen = false;
-    private UpdateAccountDto? selectedAccount = null;
-    private int selectedAccountId = 0;
-
-    // Dropdown data
-    private List<EmployeeDto> employeeList = new();
-    private List<RoleDto> roleList = new();
+    private string alertClass = "success";
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadAccounts();
-        await LoadDropdownData();
-    }
-
-    private async Task LoadAccounts()
-    {
-        accounts = await AccountService.GetAllAsync();
-    }
-
-    private async Task LoadDropdownData()
-    {
-        employeeList = await EmployeeService.GetEmployeesWithDetailsAsync();
-        roleList = await RoleService.GetAllAsync();
-    }
-
-    private IEnumerable<AccountDto> GetFilteredAccounts()
-    {
-        if (accounts == null) return Enumerable.Empty<AccountDto>();
-
-        var filtered = accounts.AsEnumerable();
-
-        if (!string.IsNullOrWhiteSpace(searchKeyword))
-        {
-            var keyword = searchKeyword.ToLower();
-            filtered = filtered.Where(a =>
-                a.Username.ToLower().Contains(keyword) ||
-                a.FullName.ToLower().Contains(keyword) ||
-                a.EmployeeCode.ToLower().Contains(keyword)
-            );
-        }
-
-        return filtered;
-    }
-
-    private IEnumerable<AccountDto> GetPaginatedAccounts()
-    {
-        var filtered = GetFilteredAccounts();
-        return filtered.Skip((currentPage - 1) * pageSize).Take(pageSize);
-    }
-
-    private int GetStartIndex()
-    {
-        var total = GetFilteredAccounts().Count();
-        if (total == 0) return 0;
-        return (currentPage - 1) * pageSize + 1;
-    }
-
-    private int GetEndIndex()
-    {
-        var total = GetFilteredAccounts().Count();
-        var end = currentPage * pageSize;
-        return Math.Min(end, total);
-    }
-
-    private int GetTotalCount()
-    {
-        return GetFilteredAccounts().Count();
-    }
-
-    private void FirstPage() => currentPage = 1;
-    private void PreviousPage() { if (currentPage > 1) currentPage--; }
-    private void NextPage() { if (currentPage < totalPages) currentPage++; }
-    private void LastPage() => currentPage = totalPages;
-
-    private void ApplyFilters()
-    {
-        currentPage = 1;
-        StateHasChanged();
-    }
-
-    private void ClearSearch()
-    {
-        searchKeyword = string.Empty;
-        currentPage = 1;
-        StateHasChanged();
-    }
-
-    private void AddNewAccount()
-    {
-        isCreateModalOpen = true;
-    }
-
-    private void CloseCreateModal()
-    {
-        isCreateModalOpen = false;
-        message = string.Empty;
-    }
-
-    private async Task HandleCreateAccount(CreateAccountDto newAccount)
-    {
         try
         {
-            var createdAccount = await AccountService.CreateAsync(newAccount);
-            message = $"Đã tạo tài khoản {createdAccount.Username} thành công.";
-            alertClass = "alert-success-dark";
-            isCreateModalOpen = false;
-            await LoadAccounts();
-            currentPage = 1;
-        }
-        catch (BusinessException ex)
-        {
-            businessErrorMessage = ex.Message;
-            showBusinessErrorModal = true;
-            isCreateModalOpen = false;
+            accounts = await AccountService.GetAllAsync();
         }
         catch (Exception ex)
         {
-            message = $"Lỗi hệ thống: {ex.Message}";
-            alertClass = "alert-danger-dark";
-            isCreateModalOpen = false;
+            message = $"Lỗi: {ex.Message}";
+            alertClass = "danger";
         }
     }
 
-    private void EditAccount(int accountId)
+    private void ShowCreateModal()
     {
-        var account = accounts?.FirstOrDefault(a => a.Id == accountId);
-        if (account != null)
-        {
-            selectedAccount = new UpdateAccountDto
-            {
-                Id = account.Id,
-                Username = account.Username,
-                Status = account.Status,
-                RoleIds = account.RoleIds
-            };
-            isEditModalOpen = true;
-            message = string.Empty;
-        }
+        message = "Chức năng đang phát triển - Tạo tài khoản mới";
+        alertClass = "info";
     }
 
-    private void CloseEditModal()
+    private void EditAccount(int id)
     {
-        isEditModalOpen = false;
-        selectedAccount = null;
-        message = string.Empty;
+        message = $"Chức năng đang phát triển - Sửa tài khoản ID: {id}";
+        alertClass = "info";
     }
 
-    private async Task HandleUpdateAccount(UpdateAccountDto updatedAccount)
+    private void ChangePassword(int id)
     {
-        try
-        {
-            bool success = await AccountService.UpdateAsync(updatedAccount);
-            if (!success)
-            {
-                message = "Không tìm thấy tài khoản để cập nhật.";
-                alertClass = "alert-danger-dark";
-            }
-            else
-            {
-                message = $"Đã cập nhật tài khoản {updatedAccount.Username} thành công.";
-                alertClass = "alert-success-dark";
-                await LoadAccounts();
-            }
-            isEditModalOpen = false;
-            selectedAccount = null;
-        }
-        catch (BusinessException ex)
-        {
-            businessErrorMessage = ex.Message;
-            showBusinessErrorModal = true;
-            isEditModalOpen = false;
-            selectedAccount = null;
-        }
-        catch (Exception ex)
-        {
-            message = $"Lỗi hệ thống: {ex.Message}";
-            alertClass = "alert-danger-dark";
-            isEditModalOpen = false;
-            selectedAccount = null;
-        }
+        message = $"Chức năng đang phát triển - Đổi mật khẩu tài khoản ID: {id}";
+        alertClass = "info";
     }
 
-    private void ChangePassword(int accountId)
+    private void DeleteAccount(int id)
     {
-        selectedAccountId = accountId;
-        isChangePasswordModalOpen = true;
-    }
-
-    private void CloseChangePasswordModal()
-    {
-        isChangePasswordModalOpen = false;
-        selectedAccountId = 0;
-        message = string.Empty;
-    }
-
-    private async Task HandleChangePassword(ChangePasswordDto dto)
-    {
-        try
-        {
-            bool success = await AccountService.ChangePasswordAsync(dto);
-            if (success)
-            {
-                message = "Đã đổi mật khẩu thành công.";
-                alertClass = "alert-success-dark";
-            }
-            else
-            {
-                message = "Không tìm thấy tài khoản.";
-                alertClass = "alert-danger-dark";
-            }
-            isChangePasswordModalOpen = false;
-            selectedAccountId = 0;
-        }
-        catch (Exception ex)
-        {
-            message = $"Lỗi hệ thống: {ex.Message}";
-            alertClass = "alert-danger-dark";
-            isChangePasswordModalOpen = false;
-            selectedAccountId = 0;
-        }
-    }
-
-    private void DeleteAccount(int accountId)
-    {
-        deleteAccountId = accountId;
-        showDeleteModal = true;
-    }
-
-    private void CloseDeleteModal()
-    {
-        showDeleteModal = false;
-        deleteAccountId = 0;
-    }
-
-    private async Task ConfirmDelete()
-    {
-        try
-        {
-            bool success = await AccountService.DeleteAsync(deleteAccountId);
-            if (success)
-            {
-                message = "Đã xóa tài khoản thành công.";
-                alertClass = "alert-success-dark";
-                await LoadAccounts();
-            }
-            else
-            {
-                message = "Không tìm thấy tài khoản để xóa.";
-                alertClass = "alert-danger-dark";
-            }
-            showDeleteModal = false;
-            deleteAccountId = 0;
-        }
-        catch (Exception ex)
-        {
-            message = $"Lỗi hệ thống: {ex.Message}";
-            alertClass = "alert-danger-dark";
-            showDeleteModal = false;
-            deleteAccountId = 0;
-        }
-    }
-
-    private void CloseBusinessErrorModal()
-    {
-        showBusinessErrorModal = false;
-        businessErrorMessage = string.Empty;
+        message = $"Chức năng đang phát triển - Xóa tài khoản ID: {id}";
+        alertClass = "info";
     }
 }
-
-<style>
-    /* Dark Theme Styles */
-    .page-title {
-        color: #f1f5f9;
-        font-size: 1.75rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
-
-    .page-subtitle {
-        color: #94a3b8;
-        font-size: 0.95rem;
-        margin-bottom: 0;
-    }
-
-    .table-toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1.5rem;
-        padding: 1.25rem 1.5rem;
-        background: rgba(20, 23, 38, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px 12px 0 0;
-    }
-
-    .toolbar-left {
-        flex: 1;
-        max-width: 400px;
-    }
-
-    .toolbar-right {
-        flex-shrink: 0;
-    }
-
-    .search-box {
-        position: relative;
-        width: 100%;
-    }
-
-    .search-icon {
-        position: absolute;
-        left: 1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #94a3b8;
-    }
-
-    .search-input {
-        width: 100%;
-        padding-left: 2.75rem;
-        padding-right: 2.5rem;
-        background: rgba(30, 41, 59, 0.6) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-        color: #e2e8f0 !important;
-    }
-
-    .btn-clear-search {
-        position: absolute;
-        right: 0.5rem;
-        top: 50%;
-        transform: translateY(-50%);
-        background: none;
-        border: none;
-        color: #94a3b8;
-        cursor: pointer;
-    }
-
-    .btn-add-new {
-        padding: 0.6rem 1.25rem;
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        border: none;
-        border-radius: 8px;
-        color: white;
-        font-weight: 500;
-        cursor: pointer;
-    }
-
-    .card-dark {
-        background: rgba(20, 23, 38, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 0 0 12px 12px;
-    }
-
-    .table-dark-custom {
-        width: 100%;
-        color: #e2e8f0;
-    }
-
-    .table-dark-custom thead th {
-        background: rgba(51, 65, 85, 0.5);
-        color: #f1f5f9;
-        padding: 1rem;
-        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .table-dark-custom tbody td {
-        padding: 1rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .username-text { color: #60a5fa; font-weight: 500; }
-    .employee-name-text { color: #e2e8f0; }
-    .employee-code-text { color: #94a3b8; font-family: monospace; }
-    .email-text { color: #94a3b8; font-size: 0.9rem; }
-
-    .badge-dark {
-        padding: 0.35rem 0.75rem;
-        border-radius: 6px;
-        font-size: 0.85rem;
-        font-weight: 500;
-    }
-
-    .badge-role {
-        background: rgba(168, 85, 247, 0.25);
-        color: #c084fc;
-        border: 1px solid rgba(168, 85, 247, 0.5);
-    }
-
-    .badge-active {
-        background: rgba(16, 185, 129, 0.25);
-        color: #10b981;
-        border: 1px solid rgba(16, 185, 129, 0.5);
-    }
-
-    .badge-inactive {
-        background: rgba(239, 68, 68, 0.25);
-        color: #ef4444;
-        border: 1px solid rgba(239, 68, 68, 0.5);
-    }
-
-    .action-icons {
-        display: flex;
-        gap: 0.5rem;
-        justify-content: center;
-    }
-
-    .icon-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
-        border: none;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .icon-edit { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-    .icon-edit:hover { background: rgba(59, 130, 246, 0.3); }
-    .icon-key { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
-    .icon-key:hover { background: rgba(245, 158, 11, 0.3); }
-    .icon-delete { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-    .icon-delete:hover { background: rgba(239, 68, 68, 0.3); }
-
-    .pagination-wrapper {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem 1.5rem;
-        background: rgba(20, 23, 38, 0.4);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
-        margin-top: 1rem;
-    }
-
-    .pagination-text {
-        color: #94a3b8;
-        font-size: 0.9rem;
-    }
-
-    .pagination-controls {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-    }
-
-    .pagination-btn {
-        padding: 0.5rem 0.75rem;
-        background: rgba(30, 41, 59, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 6px;
-        color: #e2e8f0;
-        cursor: pointer;
-    }
-
-    .pagination-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    .alert-success-dark {
-        background: rgba(16, 185, 129, 0.2);
-        border: 1px solid rgba(16, 185, 129, 0.4);
-        color: #10b981;
-    }
-
-    .alert-danger-dark {
-        background: rgba(239, 68, 68, 0.2);
-        border: 1px solid rgba(239, 68, 68, 0.4);
-        color: #ef4444;
-    }
-
-    .alert-info-dark {
-        background: rgba(59, 130, 246, 0.2);
-        border: 1px solid rgba(59, 130, 246, 0.4);
-        color: #60a5fa;
-    }
-
-    .modal-content-dark {
-        background: #1e293b;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: #e2e8f0;
-    }
-
-    .modal-header-dark {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 1.25rem;
-    }
-
-    .modal-body-dark {
-        padding: 1.5rem;
-    }
-
-    .modal-footer-dark {
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 1.25rem;
-    }
-
-    .btn-secondary-dark {
-        background: rgba(71, 85, 105, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: #e2e8f0;
-        padding: 0.5rem 1.25rem;
-        border-radius: 6px;
-    }
-
-    .btn-danger-dark {
-        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-        border: none;
-        color: white;
-        padding: 0.5rem 1.25rem;
-        border-radius: 6px;
-    }
-
-    .text-muted-light {
-        color: #94a3b8;
-    }
-</style>
