@@ -1,0 +1,169 @@
+﻿@page "/requests/approvals"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using System.Security.Claims
+@using HRMS.Application.DTOs
+@using HRMS.Application.Interfaces
+@using Microsoft.AspNetCore.SignalR.Client
+@using HRMS.Domain.Entities
+@inject IRequestService RequestService
+@inject NavigationManager NavManager
+@inject AuthenticationStateProvider AuthStateProvider
+@implements IAsyncDisposable
+
+<PageTitle>Duyệt đơn</PageTitle>
+
+<h3>Danh sách đơn chờ duyệt</h3>
+
+@if (!_accountResolved)
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+else
+{
+
+    @if (_pendingRequests is null)
+    {
+        <p>Đang tải...</p>
+    }
+    else if (_pendingRequests.Count == 0)
+    {
+        <p class="text-muted">Không có đơn nào đang chờ duyệt.</p>
+    }
+    else
+    {
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Nhân viên</th>
+                    <th>Loại đơn</th>
+                    <th>Nội dung</th>
+                    <th>Lý do</th>
+                    <th>Ngày tạo</th>
+                    <th>Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in _pendingRequests)
+                {
+                    <tr id="req-@r.Id">
+                        <td>@r.AccountName</td>
+                        <td>@r.RequestTypeName</td>
+                        <td>@r.Summary</td>
+                        <td>@r.Reason</td>
+                        <td>@r.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>
+                            <button class="btn btn-sm btn-success me-1"
+                                    disabled="@_processingIds.Contains(r.Id)"
+                                    @onclick="() => Approve(r.Id)">
+                                Duyệt
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger"
+                                    disabled="@_processingIds.Contains(r.Id)"
+                                    @onclick="() => Reject(r.Id)">
+                                Từ chối
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger mt-3">@_errorMessage</div>
+    }
+}
+
+@code {
+    private int ApproverAccountId;
+    private bool _accountResolved;
+
+    private List<RequestListItemDto>? _pendingRequests;
+    private readonly HashSet<int> _processingIds = new();
+    private string? _errorMessage;
+
+    private Microsoft.AspNetCore.SignalR.Client.HubConnection? _hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var idClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(idClaim, out ApproverAccountId))
+        {
+            _errorMessage = "Không xác định được tài khoản đăng nhập. Vui lòng đăng nhập lại.";
+            return;
+        }
+
+        _accountResolved = true;
+
+        await LoadAsync();
+
+        _hubConnection = new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder()
+            .WithUrl(NavManager.ToAbsoluteUri("/hubs/requests"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<RequestListItemDto>("RequestCreated", async (newRequest) =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadAsync();
+                StateHasChanged();
+            });
+        });
+
+        await _hubConnection.StartAsync();
+        await _hubConnection.SendAsync("JoinManagerGroup", ApproverAccountId);
+    }
+
+    private async Task LoadAsync()
+    {
+        _pendingRequests = await RequestService.GetPendingApprovalsAsync(ApproverAccountId);
+    }
+
+    private async Task Approve(int requestId)
+    {
+        _errorMessage = null;
+        _processingIds.Add(requestId);
+        try
+        {
+            await RequestService.ApproveRequestAsync(requestId, ApproverAccountId);
+            await LoadAsync();
+        }
+        catch (Application.RequestWorkflowException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _processingIds.Remove(requestId);
+        }
+    }
+
+    private async Task Reject(int requestId)
+    {
+        _errorMessage = null;
+        _processingIds.Add(requestId);
+        try
+        {
+            await RequestService.RejectRequestAsync(requestId, ApproverAccountId);
+            await LoadAsync();
+        }
+        catch (Application.RequestWorkflowException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _processingIds.Remove(requestId);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+            await _hubConnection.DisposeAsync();
+    }
+}
