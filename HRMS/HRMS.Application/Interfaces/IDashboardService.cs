@@ -5,5 +5,5 @@ namespace HRMS.Application.Interfaces;
 
 public interface IDashboardService
 {
-    Task<DashboardSummaryDto> GetDashboardSummaryAsync();
+    Task<DashboardSummaryDto> GetDashboardSummaryAsync(int accountId);
 }

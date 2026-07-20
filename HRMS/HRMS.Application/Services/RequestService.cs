@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -325,6 +325,32 @@ namespace HRMS.Application.Services
 
             var result = new List<RequestListItemDto>();
             foreach (var item in pending)
+                result.Add(await ToListItemDtoAsync(item, item.RequestType));
+
+            return result;
+        }
+
+        public async Task<List<RequestListItemDto>> GetProcessedApprovalsAsync(int approverAccountId)
+        {
+            var directorId = await _employeeLookup.GetDirectorAccountIdAsync();
+            var isDirector = directorId is not null && directorId == approverAccountId;
+
+            List<Request> processed;
+
+            await using (await _gate.EnterAsync())
+            {
+                var query = _db.Requests
+                    .Include(r => r.RequestType)
+                    .Where(r => r.Status == RequestStatuses.Approved || r.Status == RequestStatuses.Rejected);
+
+                if (!isDirector)
+                    query = query.Where(r => r.CurrentApproverAccountId == approverAccountId);
+
+                processed = await query.OrderByDescending(r => r.CreatedAt).ToListAsync();
+            }
+
+            var result = new List<RequestListItemDto>();
+            foreach (var item in processed)
                 result.Add(await ToListItemDtoAsync(item, item.RequestType));
 
             return result;

@@ -130,7 +130,7 @@
                                     <th>Mã NV</th>
                                     <th>Họ và Tên</th>
                                     <th>Chức vụ</th>
-                                    <th>Lương cơ bản</th>
+                                    <th>Lương hợp đồng</th>
                                     <th>Lương OT</th>
                                     <th>Gross</th>
                                     <th>Bảo hiểm (10.5%)</th>
@@ -158,7 +158,7 @@
                                         <td class="number-cell fw-bold text-success">@slip.NetAmount.ToString("N0") <span class="currency-unit">đ</span></td>
                                         <td class="text-center">
                                             <span class="badge-status @GetStatusClass(slip.Status)">
-                                                @slip.Status
+                                                @TranslateStatus(slip.Status)
                                             </span>
                                         </td>
                                     </tr>
@@ -534,6 +534,19 @@
             "approved" => "badge-status-approved",
             "paid" => "badge-status-paid",
             _ => "badge-status-draft"
+        };
+    }
+
+    private string TranslateStatus(string status)
+    {
+        return status.ToUpperInvariant() switch
+        {
+            "DRAFT" => "Bản nháp",
+            "PENDING" => "Chờ phê duyệt",
+            "APPROVED" => "Đã phê duyệt",
+            "REJECTED" => "Đã từ chối",
+            "PAID" => "Đã thanh toán",
+            _ => status
         };
     }
 }

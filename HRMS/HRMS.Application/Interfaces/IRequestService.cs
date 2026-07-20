@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using HRMS.Application.DTOs;
 
@@ -23,6 +23,9 @@ namespace HRMS.Application.Interfaces
 
         /// <summary>Danh sách đơn đang chờ tài khoản này duyệt (trang ApprovalList).</summary>
         Task<List<RequestListItemDto>> GetPendingApprovalsAsync(int approverAccountId);
+
+        /// <summary>Danh sách đơn tài khoản này đã phê duyệt hoặc từ chối (lịch sử duyệt đơn).</summary>
+        Task<List<RequestListItemDto>> GetProcessedApprovalsAsync(int approverAccountId);
 
         /// <summary>Danh sách loại đơn (đọc từ bảng RequestTypes có sẵn trong DB) để hiển thị dropdown trên UI.</summary>
         Task<List<RequestTypeDto>> GetRequestTypesAsync();

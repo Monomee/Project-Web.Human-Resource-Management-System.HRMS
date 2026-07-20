@@ -18,7 +18,7 @@ public class DashboardService : IDashboardService
         _context = context;
     }
 
-    public async Task<DashboardSummaryDto> GetDashboardSummaryAsync()
+    public async Task<DashboardSummaryDto> GetDashboardSummaryAsync(int accountId)
     {
         // 1. Tổng số nhân sự đang hoạt động
         int totalActiveEmployees = await _context.Users.CountAsync(u => u.Status);
@@ -80,13 +80,54 @@ public class DashboardService : IDashboardService
             }
         }
 
+        // 5. Thống kê cá nhân nhân viên
+        int remainingLeaveDays = 0;
+        int myPendingRequestsCount = 0;
+        int myWorkDaysInLatestPeriod = 0;
+
+        var account = await _context.Accounts
+            .Include(a => a.User)
+            .FirstOrDefaultAsync(a => a.Id == accountId);
+
+        if (account != null && account.User != null)
+        {
+            var userId = account.UserId;
+            var currentYear = DateTime.Now.Year;
+
+            // Số ngày phép còn lại
+            var leaveBalance = await _context.LeaveBalances
+                .FirstOrDefaultAsync(lb => lb.UserId == userId && lb.Year == currentYear);
+            remainingLeaveDays = leaveBalance?.RemainingDays ?? 12;
+
+            // Đơn từ cá nhân đang chờ duyệt
+            myPendingRequestsCount = await _context.Requests
+                .CountAsync(r => r.CreatedByAccountId == accountId && r.Status == "Pending");
+
+            // Số ngày công trong kỳ gần nhất
+            var latestPeriod = await _context.TimesheetPeriods
+                .OrderByDescending(p => p.StartDate)
+                .FirstOrDefaultAsync();
+
+            if (latestPeriod != null)
+            {
+                myWorkDaysInLatestPeriod = await _context.AttendanceLogs
+                    .Where(log => log.UserId == userId && log.PeriodId == latestPeriod.Id)
+                    .Select(log => log.CheckedAt.Date)
+                    .Distinct()
+                    .CountAsync();
+            }
+        }
+
         return new DashboardSummaryDto
         {
             TotalActiveEmployees = totalActiveEmployees,
             PendingRequestsCount = pendingRequestsCount,
             LatestPayrollExpense = latestPayrollExpense,
             LatestPeriodName = latestPeriodName,
-            MonthlyPayrollHistory = monthlyPayrollHistory
+            MonthlyPayrollHistory = monthlyPayrollHistory,
+            RemainingLeaveDays = remainingLeaveDays,
+            MyPendingRequestsCount = myPendingRequestsCount,
+            MyWorkDaysInLatestPeriod = myWorkDaysInLatestPeriod
         };
     }
 }
