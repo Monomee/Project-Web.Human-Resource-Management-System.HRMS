@@ -138,7 +138,7 @@
                             </div>
                             <div class="info-item">
                                 <span class="info-lbl">Công chuẩn quy định:</span>
-                                <span class="info-val">26.0 ngày</span>
+                                <span class="info-val">@StandardWorkingDays.ToString("F1") ngày</span>
                             </div>
                         </div>
                     </div>
@@ -167,35 +167,44 @@
                                     @* 2. Lương thực tế ngày công *@
                                     <tr>
                                         <td>2. Lương theo ngày công làm việc & phép</td>
-                                        <td class="text-end">((D_actual + D_leave_paid) / 26) * Lương HĐ</td>
+                                        <td class="text-end text-muted-light">
+                                            <div>((@_payslip.ActualDays.ToString("F1") + @_payslip.LeavePaidDays.ToString("F1")) / @StandardWorkingDays) * @_payslip.BaseSalary.ToString("N0") đ</div>
+                                            <div style="font-size: 0.75rem; opacity: 0.6;">((D_actual + D_leave_paid) / D_standard) * Lương HĐ</div>
+                                        </td>
                                         <td class="text-end text-success">@CalculatedDaysSalary.ToString("N0") đ</td>
                                         <td class="text-end">-</td>
                                     </tr>
                                     @* 3. Lương OT *@
                                     <tr>
                                         <td>3. Lương làm thêm giờ (OT)</td>
-                                        <td class="text-end">H_ot * (Lương HĐ / (26*8)) * 1.5</td>
+                                        <td class="text-end text-muted-light">
+                                            <div>@_payslip.OtHours.ToString("F1") * (@_payslip.BaseSalary.ToString("N0") đ / (@StandardWorkingDays * 8)) * 1.5</div>
+                                            <div style="font-size: 0.75rem; opacity: 0.6;">H_ot * (Lương HĐ / (D_standard * 8)) * 1.5</div>
+                                        </td>
                                         <td class="text-end text-success">@_payslip.OtSalary.ToString("N0") đ</td>
                                         <td class="text-end">-</td>
                                     </tr>
                                     @* 4. Phụ cấp *@
                                     <tr>
                                         <td>4. Phụ cấp và các khoản khác</td>
-                                        <td class="text-end">Cố định</td>
+                                        <td class="text-end text-muted-light">Cố định</td>
                                         <td class="text-end text-success">@_payslip.Allowances.ToString("N0") đ</td>
                                         <td class="text-end">-</td>
                                     </tr>
                                     @* 5. Bảo hiểm xã hội bắt buộc *@
                                     <tr>
                                         <td class="fw-semibold text-warning-light">5. Khấu trừ BHXH bắt buộc</td>
-                                        <td class="text-end text-muted">Base Salary * 10.5%</td>
+                                        <td class="text-end text-muted-light">
+                                            <div>@Math.Min(_payslip.BaseSalary, 46800000m).ToString("N0") đ * 10.5%</div>
+                                            <div style="font-size: 0.75rem; opacity: 0.6;">Lương đóng BHXH * 10.5%</div>
+                                        </td>
                                         <td class="text-end">-</td>
                                         <td class="text-end text-danger-custom">@_payslip.InsuranceDeduction.ToString("N0") đ</td>
                                     </tr>
                                     @* 6. Thuế TNCN *@
                                     <tr>
                                         <td class="fw-semibold text-warning-light">6. Thuế thu nhập cá nhân (TNCN)</td>
-                                        <td class="text-end text-muted">Lũy tiến từng phần</td>
+                                        <td class="text-end text-muted-light">Lũy tiến từng phần</td>
                                         <td class="text-end">-</td>
                                         <td class="text-end text-danger-custom">@_payslip.TaxDeduction.ToString("N0") đ</td>
                                     </tr>
@@ -261,13 +270,30 @@
     private bool _isLoading = false;
     private string? _errorMessage;
 
+    private int StandardWorkingDays
+    {
+        get
+        {
+            if (_payslip?.Period == null) return 26;
+            int days = 0;
+            for (var date = _payslip.Period.StartDate; date <= _payslip.Period.EndDate; date = date.AddDays(1))
+            {
+                if (date.DayOfWeek != DayOfWeek.Sunday)
+                {
+                    days++;
+                }
+            }
+            return days > 0 ? days : 26;
+        }
+    }
+
     // Lương ngày công thực tế (breakdown)
     private decimal CalculatedDaysSalary
     {
         get
         {
             if (_payslip == null) return 0m;
-            decimal dailyRate = Math.Round(_payslip.BaseSalary / 26m, 0, MidpointRounding.AwayFromZero);
+            decimal dailyRate = Math.Round(_payslip.BaseSalary / (decimal)StandardWorkingDays, 0, MidpointRounding.AwayFromZero);
             return Math.Round(dailyRate * (_payslip.ActualDays + _payslip.LeavePaidDays), 0, MidpointRounding.AwayFromZero);
         }
     }
