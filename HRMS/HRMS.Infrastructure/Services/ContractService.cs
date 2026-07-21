@@ -91,7 +91,7 @@ public class ContractService : IContractService
             }
         }
 
-        // Create new contract with status "Active"
+        // Create new contract with status "Pending" (awaiting HRM approval)
         var contract = new EmploymentContract
         {
             ContractNo = newContractNo,
@@ -99,7 +99,7 @@ public class ContractService : IContractService
             BaseSalary = dto.BaseSalary,
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
-            Status = "Active", // Status is Active by default
+            Status = "Pending", // Status is Pending by default (HR creates → HRM approves)
             UserId = dto.UserId
         };
 
@@ -121,7 +121,10 @@ public class ContractService : IContractService
 
     /// <summary>
     /// Update an existing employment contract
-    /// Authorization: Only HRM role can update
+    /// Business Rules:
+    /// - Only contracts with status "Pending" or "Rejected" can be edited
+    /// - When updating a "Rejected" contract, status automatically changes back to "Pending"
+    /// Authorization: Only HR and HRM roles can update
     /// </summary>
     public async Task<bool> UpdateAsync(UpdateContractDto dto)
     {
@@ -138,12 +141,27 @@ public class ContractService : IContractService
             return false;
         }
 
+        // Business Rule: Only Pending or Rejected contracts can be edited
+        if (contract.Status != "Pending" && contract.Status != "Rejected")
+        {
+            throw new BusinessException("Chỉ có thể chỉnh sửa hợp đồng đang ở trạng thái 'Chờ duyệt' hoặc 'Từ chối'.");
+        }
+
         // Update fields
         contract.ContractType = dto.ContractType;
         contract.BaseSalary = dto.BaseSalary;
         contract.StartDate = dto.StartDate;
         contract.EndDate = dto.EndDate;
-        contract.Status = dto.Status;
+
+        // Business Rule: When updating a Rejected contract, change status back to Pending
+        if (contract.Status == "Rejected")
+        {
+            contract.Status = "Pending";
+        }
+        else
+        {
+            contract.Status = dto.Status;
+        }
 
         await _context.SaveChangesAsync();
         return true;
@@ -215,6 +233,57 @@ public class ContractService : IContractService
         }
 
         contract.Status = "Rejected";
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Terminate a contract (change Active contract to terminated)
+    /// Authorization: Only HRM role can terminate
+    /// </summary>
+    public async Task<bool> TerminateContractAsync(int contractId, string reason)
+    {
+        var contract = await _context.EmploymentContracts.FindAsync(contractId);
+        if (contract == null)
+        {
+            return false;
+        }
+
+        if (contract.Status != "Active")
+        {
+            throw new BusinessException("Chỉ có thể chấm dứt hợp đồng đang ở trạng thái 'Hiệu lực'.");
+        }
+
+        // Terminate contract by setting EndDate to today (or you can use a "Terminated" status if needed)
+        contract.EndDate = DateOnly.FromDateTime(DateTime.Today);
+        // Or optionally: contract.Status = "Terminated";
+
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Deactivate/Disable a contract (vô hiệu hóa)
+    /// Changes status from Active to Terminated without modifying EndDate
+    /// </summary>
+    public async Task<bool> DeactivateContractAsync(int contractId, string reason)
+    {
+        var contract = await _context.EmploymentContracts.FindAsync(contractId);
+        if (contract == null)
+        {
+            return false;
+        }
+
+        if (contract.Status != "Active")
+        {
+            throw new BusinessException("Chỉ có thể vô hiệu hóa hợp đồng đang ở trạng thái 'Hiệu lực'.");
+        }
+
+        // Deactivate by changing status to Terminated
+        contract.Status = "Terminated";
+
         await _context.SaveChangesAsync();
 
         return true;

@@ -30,7 +30,7 @@
                                 </select>
                             </div>
 
-                            <!-- Roles Selection -->
+                            <!-- Roles Selection - Radio buttons (single selection) -->
                             <div class="col-12">
                                 <label class="form-label-dark">Vai trò <span class="text-danger">*</span></label>
                                 <div class="roles-checkbox-group">
@@ -38,10 +38,11 @@
                                     {
                                         <div class="form-check-dark">
                                             <input class="form-check-input" 
-                                                   type="checkbox" 
+                                                   type="radio" 
+                                                   name="roleSelection"
                                                    id="edit-role-@role.Id"
                                                    checked="@model.RoleIds.Contains(role.Id)"
-                                                   @onchange="e => ToggleRole(role.Id, e)" />
+                                                   @onchange="() => SelectRole(role.Id)" />
                                             <label class="form-check-label" for="edit-role-@role.Id">
                                                 @role.Name
                                             </label>
@@ -89,18 +90,10 @@
         }
     }
 
-    private void ToggleRole(int roleId, ChangeEventArgs e)
+    private void SelectRole(int roleId)
     {
-        bool isChecked = (bool)(e.Value ?? false);
-        if (isChecked)
-        {
-            if (!model.RoleIds.Contains(roleId))
-                model.RoleIds.Add(roleId);
-        }
-        else
-        {
-            model.RoleIds.Remove(roleId);
-        }
+        model.RoleIds.Clear();
+        model.RoleIds.Add(roleId);
     }
 
     private async Task HandleSubmit()

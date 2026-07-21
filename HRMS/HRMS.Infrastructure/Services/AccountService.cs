@@ -210,7 +210,7 @@ public class AccountService : IAccountService
         return true;
     }
 
-    public async Task<bool> ChangePasswordAsync(ChangePasswordDto dto)
+    public async Task<bool> ChangePasswordAsync(AdminChangePasswordDto dto)
     {
         await using var context = await _contextFactory.CreateDbContextAsync();
         
@@ -220,6 +220,20 @@ public class AccountService : IAccountService
             return false;
 
         account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        await context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> ResetPasswordAsync(int accountId)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        
+        var account = await context.Accounts.FindAsync(accountId);
+        
+        if (account == null)
+            return false;
+
+        account.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123");
         await context.SaveChangesAsync();
         return true;
     }

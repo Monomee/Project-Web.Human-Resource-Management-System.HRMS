@@ -38,9 +38,14 @@ public interface IAccountService
     Task<bool> DeleteAsync(int accountId);
 
     /// <summary>
-    /// Change account password
+    /// Change account password (Admin reset)
     /// </summary>
-    Task<bool> ChangePasswordAsync(ChangePasswordDto dto);
+    Task<bool> ChangePasswordAsync(AdminChangePasswordDto dto);
+
+    /// <summary>
+    /// Reset password to default (Password@123)
+    /// </summary>
+    Task<bool> ResetPasswordAsync(int accountId);
 
     /// <summary>
     /// Check if username already exists

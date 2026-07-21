@@ -23,5 +23,10 @@ public enum ContractStatus
     /// <summary>
     /// Bị từ chối
     /// </summary>
-    Rejected = 3
+    Rejected = 3,
+
+    /// <summary>
+    /// Đã vô hiệu hóa / Chấm dứt
+    /// </summary>
+    Terminated = 4
 }

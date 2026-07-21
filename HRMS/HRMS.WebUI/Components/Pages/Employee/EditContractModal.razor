@@ -87,17 +87,30 @@
                                     }
                                 </div>
 
-                                <!-- Trạng thái -->
-                                <div class="form-group-dark">
-                                    <label class="form-label-dark">
-                                        <i class="bi bi-shield-check me-1"></i>Trạng thái <span class="text-danger">*</span>
-                                    </label>
-                                    <InputSelect class="form-control-dark" @bind-Value="model.Status">
-                                        <option value="Active">Hiệu lực</option>
-                                        <option value="Draft">Nháp</option>
-                                    </InputSelect>
-                                    <ValidationMessage For="@(() => model.Status)" class="validation-message" />
-                                </div>
+                                <!-- Status Info (Read-only) -->
+                                @if (ContractData != null)
+                                {
+                                    <div class="form-group-dark">
+                                        <label class="form-label-dark">
+                                            <i class="bi bi-info-circle me-1"></i>Trạng thái
+                                        </label>
+                                        <div class="readonly-field">
+                                            @if (ContractData.Status == "Rejected")
+                                            {
+                                                <span class="badge-rejected-small me-2">@ContractData.StatusDisplayName</span>
+                                                <span class="text-info-small">→ Sẽ chuyển về <strong>Chờ duyệt</strong> sau khi lưu</span>
+                                            }
+                                            else if (ContractData.Status == "Pending")
+                                            {
+                                                <span class="badge-pending-small">@ContractData.StatusDisplayName</span>
+                                            }
+                                            else
+                                            {
+                                                <span>@ContractData.StatusDisplayName</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
                             </div>
                         </div>
 
@@ -377,6 +390,31 @@
         color: #64748b;
         font-size: 0.75rem;
         font-style: italic;
+    }
+
+    .text-info-small {
+        color: #93c5fd;
+        font-size: 0.8rem;
+    }
+
+    .badge-rejected-small {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .badge-pending-small {
+        background: rgba(251, 191, 36, 0.15);
+        color: #fcd34d;
+        border: 1px solid rgba(251, 191, 36, 0.3);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
     }
 
     /* Alert Warning Contract */

@@ -232,22 +232,74 @@
                                             <span class="badge-dark @contract.StatusBadgeClass">
                                                 <i class="bi @(contract.StatusEnum == HRMS.Domain.Enums.ContractStatus.Active ? "bi-check-circle-fill" : 
                                                              contract.StatusEnum == HRMS.Domain.Enums.ContractStatus.Pending ? "bi-clock-fill" :
-                                                             contract.StatusEnum == HRMS.Domain.Enums.ContractStatus.Rejected ? "bi-x-circle-fill" : 
+                                                             contract.StatusEnum == HRMS.Domain.Enums.ContractStatus.Rejected ? "bi-x-circle-fill" :
+                                                             contract.StatusEnum == HRMS.Domain.Enums.ContractStatus.Terminated ? "bi-pause-circle-fill" :
                                                              "bi-file-earmark") me-1"></i>
                                                 @contract.StatusDisplayName
                                             </span>
                                         </td>
                                         <td class="text-center">
-                                            <AuthorizeView Roles="HR,HRM">
-                                                <Authorized>
-                                                    <button class="btn-edit-contract" @onclick="() => OpenEditContractModal(contract)" title="Chỉnh sửa hợp đồng">
-                                                        <i class="bi bi-pencil-fill"></i>
-                                                    </button>
-                                                </Authorized>
-                                                <NotAuthorized>
-                                                    <span class="text-muted-dark">—</span>
-                                                </NotAuthorized>
-                                            </AuthorizeView>
+                                            @if (contract.Status == "Pending")
+                                            {
+                                                <!-- Pending: Show Edit (HR, HRM), Approve (HRM), Reject (HRM) -->
+                                                <div class="btn-action-group">
+                                                    <AuthorizeView Roles="HR,HRM">
+                                                        <Authorized>
+                                                            <button class="btn-edit-contract" @onclick="() => OpenEditContractModal(contract)" title="Chỉnh sửa hợp đồng">
+                                                                <i class="bi bi-pencil-fill"></i>
+                                                            </button>
+                                                        </Authorized>
+                                                    </AuthorizeView>
+                                                    
+                                                    <AuthorizeView Roles="HRM">
+                                                        <Authorized>
+                                                            <button class="btn-approve-contract" @onclick="() => OpenApproveModal(contract)" title="Phê duyệt">
+                                                                <i class="bi bi-check-circle-fill"></i>
+                                                            </button>
+                                                            <button class="btn-reject-contract" @onclick="() => OpenRejectModal(contract)" title="Từ chối">
+                                                                <i class="bi bi-x-circle-fill"></i>
+                                                            </button>
+                                                        </Authorized>
+                                                    </AuthorizeView>
+                                                </div>
+                                            }
+                                            else if (contract.Status == "Rejected")
+                                            {
+                                                <!-- Rejected: Show Edit (HR, HRM) -->
+                                                <AuthorizeView Roles="HR,HRM">
+                                                    <Authorized>
+                                                        <button class="btn-edit-contract" @onclick="() => OpenEditContractModal(contract)" title="Chỉnh sửa hợp đồng">
+                                                            <i class="bi bi-pencil-fill"></i>
+                                                        </button>
+                                                    </Authorized>
+                                                    <NotAuthorized>
+                                                        <span class="text-muted-dark">—</span>
+                                                    </NotAuthorized>
+                                                </AuthorizeView>
+                                            }
+                                            else if (contract.Status == "Active")
+                                            {
+                                                <!-- Active: Show Deactivate and Terminate (HR, HRM) -->
+                                                <AuthorizeView Roles="HR,HRM">
+                                                    <Authorized>
+                                                        <div class="btn-action-group">
+                                                            <button class="btn-deactivate-contract" @onclick="() => OpenDeactivateModal(contract)" title="Vô hiệu hóa hợp đồng">
+                                                                <i class="bi bi-pause-circle-fill"></i>
+                                                            </button>
+                                                            <button class="btn-terminate-contract" @onclick="() => OpenTerminateModal(contract)" title="Chấm dứt hợp đồng">
+                                                                <i class="bi bi-stop-circle-fill"></i>
+                                                            </button>
+                                                        </div>
+                                                    </Authorized>
+                                                    <NotAuthorized>
+                                                        <span class="text-muted-dark">—</span>
+                                                    </NotAuthorized>
+                                                </AuthorizeView>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted-dark">—</span>
+                                            }
                                         </td>
                                     </tr>
                                 }
@@ -338,6 +390,170 @@
     OnClose="@CloseEditContractModal"
     OnSave="@HandleContractUpdated" />
 
+<!-- Approve Contract Modal -->
+@if (showApproveModal && selectedContract != null)
+{
+    <div class="modal fade show d-block modal-backdrop-click" tabindex="-1" @onclick="CloseApproveModal">
+        <div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true">
+            <div class="modal-content-dark">
+                <div class="modal-header-dark">
+                    <h5 class="modal-title">
+                        <i class="bi bi-check-circle text-success me-2"></i>
+                        Phê duyệt hợp đồng
+                    </h5>
+                </div>
+                <div class="modal-body-dark">
+                    <p>Bạn có chắc chắn muốn phê duyệt hợp đồng <strong>@selectedContract.ContractNo</strong> không?</p>
+                    <p class="text-muted-small">Sau khi phê duyệt, hợp đồng sẽ chuyển sang trạng thái <strong class="text-success">Hiệu lực</strong>.</p>
+                </div>
+                <div class="modal-footer-dark">
+                    <button class="btn btn-secondary-dark" @onclick="CloseApproveModal" disabled="@isProcessing">
+                        <i class="bi bi-x-circle me-1"></i>Hủy
+                    </button>
+                    <button class="btn btn-success-modal" @onclick="ConfirmApprove" disabled="@isProcessing">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Đang xử lý...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-check-circle me-1"></i>
+                            <span>Phê duyệt</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Reject Contract Modal -->
+@if (showRejectModal && selectedContract != null)
+{
+    <div class="modal fade show d-block modal-backdrop-click" tabindex="-1" @onclick="CloseRejectModal">
+        <div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true">
+            <div class="modal-content-dark">
+                <div class="modal-header-dark">
+                    <h5 class="modal-title">
+                        <i class="bi bi-x-circle text-danger me-2"></i>
+                        Từ chối hợp đồng
+                    </h5>
+                </div>
+                <div class="modal-body-dark">
+                    <p>Bạn có chắc chắn muốn từ chối hợp đồng <strong>@selectedContract.ContractNo</strong> không?</p>
+                    <div class="form-group-dark">
+                        <label class="form-label-dark">Lý do từ chối (tùy chọn):</label>
+                        <textarea class="form-control-dark" rows="3" @bind="rejectReason" placeholder="Nhập lý do từ chối..."></textarea>
+                    </div>
+                    <p class="text-muted-small mt-2">Sau khi từ chối, hợp đồng có thể được chỉnh sửa và gửi lại.</p>
+                </div>
+                <div class="modal-footer-dark">
+                    <button class="btn btn-secondary-dark" @onclick="CloseRejectModal" disabled="@isProcessing">
+                        <i class="bi bi-x-circle me-1"></i>Hủy
+                    </button>
+                    <button class="btn btn-danger-modal" @onclick="ConfirmReject" disabled="@isProcessing">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Đang xử lý...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-x-circle me-1"></i>
+                            <span>Từ chối</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Terminate Contract Modal -->
+@if (showTerminateModal && selectedContract != null)
+{
+    <div class="modal fade show d-block modal-backdrop-click" tabindex="-1" @onclick="CloseTerminateModal">
+        <div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true">
+            <div class="modal-content-dark">
+                <div class="modal-header-dark">
+                    <h5 class="modal-title">
+                        <i class="bi bi-stop-circle text-warning me-2"></i>
+                        Chấm dứt hợp đồng
+                    </h5>
+                </div>
+                <div class="modal-body-dark">
+                    <p>Bạn có chắc chắn muốn chấm dứt hợp đồng <strong>@selectedContract.ContractNo</strong> không?</p>
+                    <div class="form-group-dark">
+                        <label class="form-label-dark">Lý do chấm dứt (tùy chọn):</label>
+                        <textarea class="form-control-dark" rows="3" @bind="terminateReason" placeholder="Nhập lý do chấm dứt..."></textarea>
+                    </div>
+                    <p class="text-danger-small mt-2"><strong>Lưu ý:</strong> Hợp đồng sau khi chấm dứt sẽ kết thúc vào ngày hôm nay.</p>
+                </div>
+                <div class="modal-footer-dark">
+                    <button class="btn btn-secondary-dark" @onclick="CloseTerminateModal" disabled="@isProcessing">
+                        <i class="bi bi-x-circle me-1"></i>Hủy
+                    </button>
+                    <button class="btn btn-warning-modal" @onclick="ConfirmTerminate" disabled="@isProcessing">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Đang xử lý...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-stop-circle me-1"></i>
+                            <span>Chấm dứt</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Deactivate Contract Modal -->
+@if (showDeactivateModal && selectedContract != null)
+{
+    <div class="modal fade show d-block modal-backdrop-click" tabindex="-1" @onclick="CloseDeactivateModal">
+        <div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true">
+            <div class="modal-content-dark">
+                <div class="modal-header-dark">
+                    <h5 class="modal-title">
+                        <i class="bi bi-pause-circle text-info me-2"></i>
+                        Vô hiệu hóa hợp đồng
+                    </h5>
+                </div>
+                <div class="modal-body-dark">
+                    <p>Bạn có chắc chắn muốn vô hiệu hóa hợp đồng <strong>@selectedContract.ContractNo</strong> không?</p>
+                    <div class="form-group-dark">
+                        <label class="form-label-dark">Lý do vô hiệu hóa (tùy chọn):</label>
+                        <textarea class="form-control-dark" rows="3" @bind="deactivateReason" placeholder="Nhập lý do vô hiệu hóa..."></textarea>
+                    </div>
+                    <p class="text-info-small mt-2"><strong>Lưu ý:</strong> Hợp đồng sẽ chuyển sang trạng thái "Đã vô hiệu hóa" và không còn hiệu lực.</p>
+                </div>
+                <div class="modal-footer-dark">
+                    <button class="btn btn-secondary-dark" @onclick="CloseDeactivateModal" disabled="@isProcessing">
+                        <i class="bi bi-x-circle me-1"></i>Hủy
+                    </button>
+                    <button class="btn btn-info-modal" @onclick="ConfirmDeactivate" disabled="@isProcessing">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Đang xử lý...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-pause-circle me-1"></i>
+                            <span>Vô hiệu hóa</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter]
     public int Id { get; set; }
@@ -348,6 +564,16 @@
     private bool isCreateContractModalOpen = false;
     private bool isEditContractModalOpen = false;
     private ContractDto? selectedContract = null;
+
+    // Approval workflow modals
+    private bool showApproveModal = false;
+    private bool showRejectModal = false;
+    private bool showTerminateModal = false;
+    private bool showDeactivateModal = false;
+    private bool isProcessing = false;
+    private string rejectReason = string.Empty;
+    private string terminateReason = string.Empty;
+    private string deactivateReason = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -427,6 +653,212 @@
         // Close modal
         isEditContractModalOpen = false;
         selectedContract = null;
+    }
+
+    // Approve Modal
+    private void OpenApproveModal(ContractDto contract)
+    {
+        selectedContract = contract;
+        showApproveModal = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void CloseApproveModal()
+    {
+        showApproveModal = false;
+        selectedContract = null;
+    }
+
+    private async Task ConfirmApprove()
+    {
+        if (isProcessing || selectedContract == null) return;
+
+        try
+        {
+            isProcessing = true;
+            bool success = await ContractService.ApproveContractAsync(selectedContract.Id);
+
+            if (success)
+            {
+                successMessage = $"Đã phê duyệt hợp đồng {selectedContract.ContractNo} thành công.";
+                await LoadEmployeeDetail();
+            }
+            else
+            {
+                errorMessage = "Không thể phê duyệt hợp đồng. Vui lòng thử lại.";
+            }
+
+            CloseApproveModal();
+        }
+        catch (BusinessException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi hệ thống: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    // Reject Modal
+    private void OpenRejectModal(ContractDto contract)
+    {
+        selectedContract = contract;
+        rejectReason = string.Empty;
+        showRejectModal = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void CloseRejectModal()
+    {
+        showRejectModal = false;
+        selectedContract = null;
+        rejectReason = string.Empty;
+    }
+
+    private async Task ConfirmReject()
+    {
+        if (isProcessing || selectedContract == null) return;
+
+        try
+        {
+            isProcessing = true;
+            bool success = await ContractService.RejectContractAsync(selectedContract.Id, rejectReason);
+
+            if (success)
+            {
+                successMessage = $"Đã từ chối hợp đồng {selectedContract.ContractNo}.";
+                await LoadEmployeeDetail();
+            }
+            else
+            {
+                errorMessage = "Không thể từ chối hợp đồng. Vui lòng thử lại.";
+            }
+
+            CloseRejectModal();
+        }
+        catch (BusinessException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi hệ thống: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    // Terminate Modal
+    private void OpenTerminateModal(ContractDto contract)
+    {
+        selectedContract = contract;
+        terminateReason = string.Empty;
+        showTerminateModal = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void CloseTerminateModal()
+    {
+        showTerminateModal = false;
+        selectedContract = null;
+        terminateReason = string.Empty;
+    }
+
+    private async Task ConfirmTerminate()
+    {
+        if (isProcessing || selectedContract == null) return;
+
+        try
+        {
+            isProcessing = true;
+            bool success = await ContractService.TerminateContractAsync(selectedContract.Id, terminateReason);
+
+            if (success)
+            {
+                successMessage = $"Đã chấm dứt hợp đồng {selectedContract.ContractNo}.";
+                await LoadEmployeeDetail();
+            }
+            else
+            {
+                errorMessage = "Không thể chấm dứt hợp đồng. Vui lòng thử lại.";
+            }
+
+            CloseTerminateModal();
+        }
+        catch (BusinessException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi hệ thống: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    // Deactivate Modal
+    private void OpenDeactivateModal(ContractDto contract)
+    {
+        selectedContract = contract;
+        deactivateReason = string.Empty;
+        showDeactivateModal = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void CloseDeactivateModal()
+    {
+        showDeactivateModal = false;
+        selectedContract = null;
+        deactivateReason = string.Empty;
+    }
+
+    private async Task ConfirmDeactivate()
+    {
+        if (isProcessing || selectedContract == null) return;
+
+        try
+        {
+            isProcessing = true;
+            bool success = await ContractService.DeactivateContractAsync(selectedContract.Id, deactivateReason);
+
+            if (success)
+            {
+                successMessage = $"Đã vô hiệu hóa hợp đồng {selectedContract.ContractNo}.";
+                await LoadEmployeeDetail();
+            }
+            else
+            {
+                errorMessage = "Không thể vô hiệu hóa hợp đồng. Vui lòng thử lại.";
+            }
+
+            CloseDeactivateModal();
+        }
+        catch (BusinessException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi hệ thống: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
     }
 }
 
@@ -547,6 +979,13 @@
         background: rgba(239, 68, 68, 0.25);
         color: #ef4444;
         border: 1px solid rgba(239, 68, 68, 0.5);
+        font-weight: 600;
+    }
+
+    .badge-terminated {
+        background: rgba(100, 116, 139, 0.25);
+        color: #94a3b8;
+        border: 1px solid rgba(100, 116, 139, 0.5);
         font-weight: 600;
     }
 
@@ -953,5 +1392,221 @@
             width: 100%;
             justify-content: center;
         }
+    }
+
+    /* Action Button Group */
+    .btn-action-group {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Approve Button */
+    .btn-approve-contract {
+        padding: 0.45rem 0.75rem;
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        color: #86efac;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-approve-contract:hover {
+        background: rgba(34, 197, 94, 0.25);
+        border-color: rgba(34, 197, 94, 0.5);
+        color: #4ade80;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(34, 197, 94, 0.2);
+    }
+
+    /* Reject Button */
+    .btn-reject-contract {
+        padding: 0.45rem 0.75rem;
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-reject-contract:hover {
+        background: rgba(239, 68, 68, 0.25);
+        border-color: rgba(239, 68, 68, 0.5);
+        color: #ef4444;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(239, 68, 68, 0.2);
+    }
+
+    /* Terminate Button */
+    .btn-terminate-contract {
+        padding: 0.45rem 0.75rem;
+        background: rgba(245, 158, 11, 0.15);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        color: #fcd34d;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-terminate-contract:hover {
+        background: rgba(245, 158, 11, 0.25);
+        border-color: rgba(245, 158, 11, 0.5);
+        color: #f59e0b;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(245, 158, 11, 0.2);
+    }
+
+    /* Deactivate Button */
+    .btn-deactivate-contract {
+        padding: 0.45rem 0.75rem;
+        background: rgba(59, 130, 246, 0.15);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        color: #93c5fd;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-deactivate-contract:hover {
+        background: rgba(59, 130, 246, 0.25);
+        border-color: rgba(59, 130, 246, 0.5);
+        color: #60a5fa;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2);
+    }
+
+    /* Modal Buttons */
+    .btn-success-modal {
+        padding: 0.6rem 1.5rem;
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%);
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        color: #86efac;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+    }
+
+    .btn-success-modal:hover:not(:disabled) {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(22, 163, 74, 0.3) 100%);
+        border-color: rgba(34, 197, 94, 0.6);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+    }
+
+    .btn-success-modal:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-danger-modal {
+        padding: 0.6rem 1.5rem;
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: #fca5a5;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+    }
+
+    .btn-danger-modal:hover:not(:disabled) {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.3) 100%);
+        border-color: rgba(239, 68, 68, 0.6);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    }
+
+    .btn-danger-modal:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-warning-modal {
+        padding: 0.6rem 1.5rem;
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.2) 100%);
+        border: 1px solid rgba(245, 158, 11, 0.4);
+        color: #fcd34d;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+    }
+
+    .btn-warning-modal:hover:not(:disabled) {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.3) 0%, rgba(217, 119, 6, 0.3) 100%);
+        border-color: rgba(245, 158, 11, 0.6);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+    }
+
+    .btn-warning-modal:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-info-modal {
+        padding: 0.6rem 1.5rem;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%);
+        border: 1px solid rgba(59, 130, 246, 0.4);
+        color: #93c5fd;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+    }
+
+    .btn-info-modal:hover:not(:disabled) {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.3) 100%);
+        border-color: rgba(59, 130, 246, 0.6);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    }
+
+    .btn-info-modal:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .text-muted-small {
+        color: #94a3b8;
+        font-size: 0.85rem;
+    }
+
+    .text-danger-small {
+        color: #fca5a5;
+        font-size: 0.85rem;
+    }
+
+    .text-info-small {
+        color: #93c5fd;
+        font-size: 0.85rem;
     }
 </style>

@@ -47,4 +47,16 @@ public interface IContractService
     /// Authorization: Only HRM role can reject
     /// </summary>
     Task<bool> RejectContractAsync(int contractId, string reason);
+
+    /// <summary>
+    /// Terminate a contract (change status from Active to Terminated)
+    /// Authorization: Only HRM role can terminate
+    /// </summary>
+    Task<bool> TerminateContractAsync(int contractId, string reason);
+
+    /// <summary>
+    /// Deactivate/Disable a contract (vô hiệu hóa - change Active contract to Terminated status)
+    /// Authorization: Only HRM role can deactivate
+    /// </summary>
+    Task<bool> DeactivateContractAsync(int contractId, string reason);
 }

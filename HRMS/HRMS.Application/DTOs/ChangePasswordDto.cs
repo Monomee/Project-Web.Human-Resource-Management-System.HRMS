@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace HRMS.Application.DTOs
 {
+    // DTO for users changing their own password
     public class ChangePasswordDto
     {
         [Required(ErrorMessage = "Mật khẩu hiện tại không được để trống.")]
@@ -14,5 +15,12 @@ namespace HRMS.Application.DTOs
         [Required(ErrorMessage = "Xác nhận mật khẩu mới không được để trống.")]
         [Compare("NewPassword", ErrorMessage = "Mật khẩu xác nhận không trùng khớp.")]
         public string ConfirmPassword { get; set; } = string.Empty;
+    }
+
+    // DTO for admin resetting someone else's password
+    public class AdminChangePasswordDto
+    {
+        public int AccountId { get; set; }
+        public string NewPassword { get; set; } = string.Empty;
     }
 }

@@ -72,13 +72,13 @@
                                         }
                                     </td>
                                     <td class="text-center">
-                                        <button class="btn btn-sm btn-info me-1" @onclick="() => EditAccount(acc.Id)" title="Sửa">
+                                        <button class="btn btn-sm btn-info me-1" @onclick="() => ShowEditModal(acc.Id)" title="Sửa">
                                             <i class="bi bi-pencil-fill"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-warning me-1" @onclick="() => ChangePassword(acc.Id)" title="Đổi MK">
-                                            <i class="bi bi-key-fill"></i>
+                                        <button class="btn btn-sm btn-warning me-1" @onclick="() => ShowResetPasswordConfirmation(acc.Id)" title="Reset mật khẩu">
+                                            <i class="bi bi-arrow-clockwise"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteAccount(acc.Id)" title="Xóa">
+                                        <button class="btn btn-sm btn-danger" @onclick="() => ShowDeleteConfirmation(acc.Id)" title="Xóa">
                                             <i class="bi bi-trash-fill"></i>
                                         </button>
                                     </td>
@@ -92,21 +92,226 @@
 
         @if (!string.IsNullOrEmpty(message))
         {
-            <div class="alert alert-@alertClass mt-3">@message</div>
+            <div class="alert alert-@alertClass mt-3">
+                <i class="bi bi-@(alertClass == "success" ? "check-circle" : "exclamation-triangle") me-2"></i>
+                @message
+            </div>
         }
     }
 </div>
 
+<!-- Create Account Modal -->
+<CreateAccountModal IsOpen="@isCreateModalOpen" OnClose="@CloseCreateModal"
+                    OnSave="@HandleCreateAccount" Employees="@employeeList" Roles="@roleList" />
+
+<!-- Edit Account Modal -->
+<EditAccountModal IsOpen="@isEditModalOpen" OnClose="@CloseEditModal"
+                  OnSave="@HandleUpdateAccount" AccountData="@selectedAccount" Roles="@roleList" />
+
+<!-- Reset Password Confirmation Modal -->
+@if (showResetPasswordModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background: #1e293b; color: #e2e8f0;">
+                <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <h5 class="modal-title">
+                        <i class="bi bi-arrow-clockwise me-2 text-warning"></i>Xác nhận Reset Mật khẩu
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn reset mật khẩu tài khoản này?</p>
+                    <p class="text-warning mb-0">Mật khẩu sẽ được reset về: <strong>Password123</strong></p>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseResetPasswordModal">Hủy</button>
+                    <button type="button" class="btn btn-warning" @onclick="ConfirmResetPassword">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (showDeleteModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background: #1e293b; color: #e2e8f0;">
+                <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle-fill me-2 text-danger"></i>Xác nhận xóa
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn xóa tài khoản này?</p>
+                    <p class="text-danger mb-0">Hành động này không thể hoàn tác!</p>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDeleteModal">Hủy</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDelete">Xóa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<AccountDto>? accounts;
+    private List<EmployeeDto> employeeList = new();
+    private List<RoleDto> roleList = new();
+    
     private string message = string.Empty;
     private string alertClass = "success";
+    
+    // Modal states
+    private bool isCreateModalOpen = false;
+    private bool isEditModalOpen = false;
+    private bool showResetPasswordModal = false;
+    private bool showDeleteModal = false;
+    
+    // Selected items
+    private UpdateAccountDto? selectedAccount = null;
+    private int resetPasswordAccountId = 0;
+    private int deleteAccountId = 0;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
     {
         try
         {
             accounts = await AccountService.GetAllAsync();
+            employeeList = await EmployeeService.GetEmployeesWithDetailsAsync();
+            roleList = await RoleService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            message = $"Lỗi tải dữ liệu: {ex.Message}";
+            alertClass = "danger";
+        }
+    }
+
+    // Create
+    private void ShowCreateModal()
+    {
+        isCreateModalOpen = true;
+        message = string.Empty;
+    }
+
+    private void CloseCreateModal()
+    {
+        isCreateModalOpen = false;
+    }
+
+    private async Task HandleCreateAccount(CreateAccountDto dto)
+    {
+        try
+        {
+            var created = await AccountService.CreateAsync(dto);
+            message = $"Đã tạo tài khoản '{created.Username}' thành công!";
+            alertClass = "success";
+            isCreateModalOpen = false;
+            await LoadData();
+        }
+        catch (BusinessException ex)
+        {
+            message = $"Lỗi: {ex.Message}";
+            alertClass = "danger";
+        }
+        catch (Exception ex)
+        {
+            message = $"Lỗi hệ thống: {ex.Message}";
+            alertClass = "danger";
+        }
+    }
+
+    // Edit
+    private void ShowEditModal(int accountId)
+    {
+        var account = accounts?.FirstOrDefault(a => a.Id == accountId);
+        if (account != null)
+        {
+            selectedAccount = new UpdateAccountDto
+            {
+                Id = account.Id,
+                Username = account.Username,
+                Status = account.Status,
+                RoleIds = new List<int>(account.RoleIds)
+            };
+            isEditModalOpen = true;
+            message = string.Empty;
+        }
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalOpen = false;
+        selectedAccount = null;
+    }
+
+    private async Task HandleUpdateAccount(UpdateAccountDto dto)
+    {
+        try
+        {
+            bool success = await AccountService.UpdateAsync(dto);
+            if (success)
+            {
+                message = $"Đã cập nhật tài khoản '{dto.Username}' thành công!";
+                alertClass = "success";
+                isEditModalOpen = false;
+                await LoadData();
+            }
+            else
+            {
+                message = "Không tìm thấy tài khoản để cập nhật.";
+                alertClass = "danger";
+            }
+        }
+        catch (BusinessException ex)
+        {
+            message = $"Lỗi: {ex.Message}";
+            alertClass = "danger";
+        }
+        catch (Exception ex)
+        {
+            message = $"Lỗi hệ thống: {ex.Message}";
+            alertClass = "danger";
+        }
+    }
+
+    // Reset Password
+    private void ShowResetPasswordConfirmation(int accountId)
+    {
+        resetPasswordAccountId = accountId;
+        showResetPasswordModal = true;
+    }
+
+    private void CloseResetPasswordModal()
+    {
+        showResetPasswordModal = false;
+        resetPasswordAccountId = 0;
+    }
+
+    private async Task ConfirmResetPassword()
+    {
+        try
+        {
+            bool success = await AccountService.ResetPasswordAsync(resetPasswordAccountId);
+            if (success)
+            {
+                message = "Đã reset mật khẩu về 'Password@123' thành công!";
+                alertClass = "success";
+                showResetPasswordModal = false;
+            }
+            else
+            {
+                message = "Không tìm thấy tài khoản.";
+                alertClass = "danger";
+            }
         }
         catch (Exception ex)
         {
@@ -115,27 +320,41 @@
         }
     }
 
-    private void ShowCreateModal()
+    // Delete
+    private void ShowDeleteConfirmation(int accountId)
     {
-        message = "Chức năng đang phát triển - Tạo tài khoản mới";
-        alertClass = "info";
+        deleteAccountId = accountId;
+        showDeleteModal = true;
     }
 
-    private void EditAccount(int id)
+    private void CloseDeleteModal()
     {
-        message = $"Chức năng đang phát triển - Sửa tài khoản ID: {id}";
-        alertClass = "info";
+        showDeleteModal = false;
+        deleteAccountId = 0;
     }
 
-    private void ChangePassword(int id)
+    private async Task ConfirmDelete()
     {
-        message = $"Chức năng đang phát triển - Đổi mật khẩu tài khoản ID: {id}";
-        alertClass = "info";
-    }
-
-    private void DeleteAccount(int id)
-    {
-        message = $"Chức năng đang phát triển - Xóa tài khoản ID: {id}";
-        alertClass = "info";
+        try
+        {
+            bool success = await AccountService.DeleteAsync(deleteAccountId);
+            if (success)
+            {
+                message = "Đã xóa tài khoản thành công!";
+                alertClass = "success";
+                showDeleteModal = false;
+                await LoadData();
+            }
+            else
+            {
+                message = "Không tìm thấy tài khoản để xóa.";
+                alertClass = "danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Lỗi: {ex.Message}";
+            alertClass = "danger";
+        }
     }
 }
