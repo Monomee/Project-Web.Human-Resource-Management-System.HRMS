@@ -1,5 +1,7 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
 
 namespace HRMS.WebUI.Hubs
 {
@@ -14,10 +16,46 @@ namespace HRMS.WebUI.Hubs
     /// </summary>
     public class RequestHub : Hub
     {
-        public Task JoinManagerGroup(int approverId) =>
-            Groups.AddToGroupAsync(Context.ConnectionId, $"manager-{approverId}");
+        private readonly HRMS.WebUI.Services.TempTokenStore _tokenStore;
 
-        public Task JoinEmployeeGroup(int employeeId) =>
-            Groups.AddToGroupAsync(Context.ConnectionId, $"employee-{employeeId}");
+        public RequestHub(HRMS.WebUI.Services.TempTokenStore tokenStore)
+        {
+            _tokenStore = tokenStore;
+        }
+
+        public override async Task OnConnectedAsync()
+        {
+            var httpContext = Context.GetHttpContext();
+            var token = httpContext?.Request.Query["token"].ToString();
+            if (!string.IsNullOrEmpty(token))
+            {
+                var principal = _tokenStore.Get(token);
+                if (principal != null)
+                {
+                    Context.Items["UserPrincipal"] = principal;
+                }
+            }
+            await base.OnConnectedAsync();
+        }
+
+        public async Task JoinManagerGroup()
+        {
+            var principal = (Context.Items["UserPrincipal"] as ClaimsPrincipal) ?? Context.User;
+            var accountId = principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrEmpty(accountId))
+            {
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"manager-{accountId}");
+            }
+        }
+
+        public async Task JoinEmployeeGroup()
+        {
+            var principal = (Context.Items["UserPrincipal"] as ClaimsPrincipal) ?? Context.User;
+            var accountId = principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrEmpty(accountId))
+            {
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"employee-{accountId}");
+            }
+        }
     }
 }

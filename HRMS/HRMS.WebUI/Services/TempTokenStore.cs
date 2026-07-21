@@ -26,4 +26,11 @@ public class TempTokenStore
         _store.TryRemove(token, out var principal);
         return principal;
     }
+
+    public ClaimsPrincipal? Get(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return null;
+        _store.TryGetValue(token, out var principal);
+        return principal;
+    }
 }

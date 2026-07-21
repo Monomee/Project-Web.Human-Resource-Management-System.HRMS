@@ -1,10 +1,18 @@
-namespace HRMS.Application.DTOs;
+using System.ComponentModel.DataAnnotations;
 
-/// <summary>
-/// DTO for changing Account password
-/// </summary>
-public class ChangePasswordDto
+namespace HRMS.Application.DTOs
 {
-    public int AccountId { get; set; }
-    public string NewPassword { get; set; } = null!;
+    public class ChangePasswordDto
+    {
+        [Required(ErrorMessage = "Mật khẩu hiện tại không được để trống.")]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Mật khẩu mới không được để trống.")]
+        [MinLength(6, ErrorMessage = "Mật khẩu mới phải có tối thiểu 6 ký tự.")]
+        public string NewPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Xác nhận mật khẩu mới không được để trống.")]
+        [Compare("NewPassword", ErrorMessage = "Mật khẩu xác nhận không trùng khớp.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
 }

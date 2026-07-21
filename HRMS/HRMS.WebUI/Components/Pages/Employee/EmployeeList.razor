@@ -9,9 +9,13 @@
 @inject IPositionService PositionService
 @inject IRoleService RoleService
 @inject NavigationManager Navigation
+@inject IAuthService AuthService
+@inject IJSRuntime JS
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,HRM,HR")]
 
 <PageTitle>Danh sách Nhân viên</PageTitle>
+
+
 
 <div class="container-fluid mt-4">
     <div class="row mb-4">
@@ -176,6 +180,11 @@
                                                 <i class="bi bi-pause-circle-fill"></i>
                                             }
                                         </button>
+                                        <button class="icon-btn icon-reset" 
+                                                @onclick="() => AskResetPassword(emp.Id, emp.FullName)"
+                                                title="Đặt lại mật khẩu">
+                                            <i class="bi bi-key-fill"></i>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -304,8 +313,8 @@
 @if (showBusinessErrorModal)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7); z-index: 1050;" @onclick="CloseModal">
-        <div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true" style="z-index: 1051;">
-            <div class="modal-content-dark">
+        <div class="modal-dialog modal-dialog-centered" style="z-index: 1051;">
+            <div class="modal-content-dark" @onclick="() => {}" @onclick:stopPropagation="true">
                 <div class="modal-header-dark bg-danger">
                     <h5 class="modal-title">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>Lỗi
@@ -316,6 +325,69 @@
                 </div>
                 <div class="modal-footer-dark">
                     <button type="button" class="btn btn-secondary-dark" @onclick="CloseModal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Reset Password Confirmation Modal -->
+@if (showResetConfirmModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7); z-index: 1050;" @onclick="CloseResetConfirm">
+        <div class="modal-dialog modal-dialog-centered" style="z-index: 1051;">
+            <div class="modal-content-dark" @onclick="() => {}" @onclick:stopPropagation="true">
+                <div class="modal-header-dark bg-warning">
+                    <h5 class="modal-title">
+                        <i class="bi bi-key-fill me-2 text-dark"></i>Xác nhận đặt lại mật khẩu
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseResetConfirm" aria-label="Close"></button>
+                </div>
+                <div class="modal-body-dark text-center py-4">
+                    <i class="bi bi-shield-lock-fill text-warning fs-1 mb-3 d-block animate-pulse"></i>
+                    <p class="mb-0 fs-5 text-white">Bạn có chắc chắn muốn đặt lại mật khẩu cho nhân viên <strong>@resetUserName</strong> về mật khẩu mặc định <strong class="text-info">"Password123"</strong>?</p>
+                </div>
+                <div class="modal-footer-dark d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-secondary-dark" @onclick="CloseResetConfirm">Hủy bỏ</button>
+                    <button type="button" class="btn btn-warning text-dark fw-bold" @onclick="ConfirmResetPassword">Xác nhận</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Reset Password Success Modal -->
+@if (showResetSuccessModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7); z-index: 1050;" @onclick="CloseResetSuccess">
+        <div class="modal-dialog modal-dialog-centered" style="z-index: 1051;">
+            <div class="modal-content-dark" @onclick="() => {}" @onclick:stopPropagation="true">
+                <div class="modal-header-dark bg-success">
+                    <h5 class="modal-title">
+                        <i class="bi bi-check-circle-fill me-2"></i>Đặt lại mật khẩu thành công
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseResetSuccess" aria-label="Close"></button>
+                </div>
+                <div class="modal-body-dark text-center py-4">
+                    <i class="bi bi-shield-check text-success fs-1 mb-3 d-block"></i>
+                    <p class="mb-3 fs-5 text-white">Đặt lại mật khẩu thành công cho nhân viên <strong>@resetUserName</strong>!</p>
+                    <div class="d-flex align-items-center justify-content-center bg-dark p-3 rounded border border-secondary mb-3" style="background-color: rgba(15,23,42,0.9) !important;">
+                        <code class="fs-4 text-info fw-bold me-3">Password123</code>
+                        <button class="btn btn-sm btn-outline-info" @onclick="CopyPasswordToClipboard" title="Sao chép mật khẩu">
+                            @if (isCopied)
+                            {
+                                <i class="bi bi-check2"> Đã chép</i>
+                            }
+                            else
+                            {
+                                <i class="bi bi-clipboard"> Sao chép</i>
+                            }
+                        </button>
+                    </div>
+                    <small class="text-muted-light">Mật khẩu mới này đã được lưu vào hệ thống dưới dạng băm bảo mật.</small>
+                </div>
+                <div class="modal-footer-dark">
+                    <button type="button" class="btn btn-success" @onclick="CloseResetSuccess">Hoàn tất</button>
                 </div>
             </div>
         </div>
@@ -344,6 +416,13 @@
     private bool isAddModalOpen = false;
     private bool isEditModalOpen = false;
     private UpdateEmployeeDto? selectedEmployee = null;
+
+    // Reset password state
+    private bool showResetConfirmModal = false;
+    private bool showResetSuccessModal = false;
+    private int resetUserId = 0;
+    private string resetUserName = string.Empty;
+    private bool isCopied = false;
 
     // Dropdown data for modals
     private List<DepartmentDto> departmentList = new();
@@ -715,6 +794,72 @@
     {
         showBusinessErrorModal = false;
         businessErrorMessage = string.Empty;
+    }
+
+    private void AskResetPassword(int userId, string fullName)
+    {
+        resetUserId = userId;
+        resetUserName = fullName;
+        showResetConfirmModal = true;
+        isCopied = false;
+    }
+
+    private void CloseResetConfirm()
+    {
+        showResetConfirmModal = false;
+        resetUserId = 0;
+        resetUserName = string.Empty;
+    }
+
+    private async Task ConfirmResetPassword()
+    {
+        if (resetUserId <= 0) return;
+
+        showResetConfirmModal = false;
+        isProcessing = true;
+        message = string.Empty;
+
+        try
+        {
+            // Gọi service để reset mật khẩu trong DB
+            var passwordTemp = await AuthService.ResetPasswordAsync(resetUserId);
+            
+            showResetSuccessModal = true;
+        }
+        catch (Exception ex)
+        {
+            message = $"Lỗi hệ thống khi đặt lại mật khẩu: {ex.Message}";
+            alertClass = "alert-danger-dark";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private void CloseResetSuccess()
+    {
+        showResetSuccessModal = false;
+        resetUserId = 0;
+        resetUserName = string.Empty;
+        isCopied = false;
+    }
+
+    private async Task CopyPasswordToClipboard()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", "Password123");
+            isCopied = true;
+            StateHasChanged();
+            await Task.Delay(2000);
+            isCopied = false;
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            // Bỏ qua nếu sao chép lỗi
+        }
     }
 }
 
@@ -1119,6 +1264,17 @@
         box-shadow: 0 8px 16px rgba(251, 191, 36, 0.3);
     }
 
+    /* Icon Reset - Pink */
+    .icon-reset {
+        color: #ec4899;
+    }
+
+    .icon-reset:hover {
+        background: rgba(236, 72, 153, 0.15);
+        color: #f472b6;
+        box-shadow: 0 8px 16px rgba(236, 72, 153, 0.3);
+    }
+
     /* Alerts Dark */
     .alert {
         border-radius: 8px;
@@ -1153,6 +1309,7 @@
         color: #e2e8f0;
         position: relative;
         z-index: 1052;
+        pointer-events: auto;
     }
 
     .modal-header-dark {

@@ -140,6 +140,24 @@ namespace HRMS.Infrastructure.Services
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
+            // Create Account for the user
+            var account = new Account
+            {
+                Username = dto.EmailCompany.Split('@')[0], // Use email prefix as username
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123"), // Default password
+                Status = true,
+                UserId = user.Id
+            };
+
+            var role = await _context.Roles.FindAsync(dto.RoleId!.Value);
+            if (role != null)
+            {
+                account.Roles.Add(role);
+            }
+
+            _context.Accounts.Add(account);
+            await _context.SaveChangesAsync();
+
             // Return EmployeeDto
             var department = await _context.Departments.FindAsync(dto.DepartmentId!.Value);
             var position = await _context.Positions.FindAsync(dto.PositionId!.Value);

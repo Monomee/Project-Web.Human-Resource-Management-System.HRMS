@@ -86,4 +86,47 @@ public class AuthService : IAuthService
             Roles = roles
         };
     }
+
+    public async Task<bool> ChangePasswordAsync(int accountId, string currentPassword, string newPassword)
+    {
+        if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+            return false;
+
+        var account = await _dbContext.Accounts.FindAsync(accountId);
+        if (account == null)
+            return false;
+
+        // Kiểm tra mật khẩu cũ bằng BCrypt
+        bool isPasswordValid = false;
+        try
+        {
+            isPasswordValid = BCrypt.Net.BCrypt.Verify(currentPassword, account.PasswordHash);
+        }
+        catch (Exception)
+        {
+            isPasswordValid = false;
+        }
+
+        if (!isPasswordValid)
+            return false;
+
+        // Hash mật khẩu mới và lưu
+        account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        await _dbContext.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<string> ResetPasswordAsync(int accountId)
+    {
+        var account = await _dbContext.Accounts.FindAsync(accountId);
+        if (account == null)
+        {
+            throw new InvalidOperationException($"Không tìm thấy tài khoản với ID={accountId}");
+        }
+
+        account.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123");
+        await _dbContext.SaveChangesAsync();
+
+        return "Password123";
+    }
 }
