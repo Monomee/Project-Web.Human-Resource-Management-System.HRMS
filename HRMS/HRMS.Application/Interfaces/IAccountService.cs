@@ -43,7 +43,7 @@ public interface IAccountService
     Task<bool> ChangePasswordAsync(AdminChangePasswordDto dto);
 
     /// <summary>
-    /// Reset password to default (Password@123)
+    /// Reset password to default (Password123)
     /// </summary>
     Task<bool> ResetPasswordAsync(int accountId);
 

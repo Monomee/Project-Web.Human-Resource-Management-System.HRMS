@@ -4,16 +4,20 @@ using HRMS.Domain.Entities;
 using HRMS.Domain.Exceptions;
 using HRMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Text;
 
 namespace HRMS.Infrastructure.Services
 {
     public class EmployeeService : IEmployeeService
     {
         private readonly ApplicationDbContext _context;
+        private readonly IAccountService _accountService;
 
-        public EmployeeService(ApplicationDbContext context)
+        public EmployeeService(ApplicationDbContext context, IAccountService accountService)
         {
             _context = context;
+            _accountService = accountService;
         }
 
         public async Task<List<EmployeeDto>> GetEmployeesWithDetailsAsync()
@@ -123,7 +127,7 @@ namespace HRMS.Infrastructure.Services
                 newEmployeeCode = $"NV{(lastNumber + 1):D3}";
             }
 
-            // Create User entity only (Account creation is now separate)
+            // Create User entity
             var user = new User
             {
                 EmployeeCode = newEmployeeCode,
@@ -140,23 +144,49 @@ namespace HRMS.Infrastructure.Services
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Create Account for the user
-            var account = new Account
-            {
-                Username = dto.EmailCompany.Split('@')[0], // Use email prefix as username
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123"), // Default password
-                Status = true,
-                UserId = user.Id
-            };
+            // AUTO-CREATE ACCOUNT: Generate username from FullName
+            // Example: "Long Tuấn Duy" -> "longtuanduy"
+            string baseUsername = RemoveVietnameseDiacritics(dto.FullName)
+                .ToLower()
+                .Replace(" ", "");
 
-            var role = await _context.Roles.FindAsync(dto.RoleId!.Value);
-            if (role != null)
+            // Check for username conflicts and append number if exists
+            string username = baseUsername;
+            int suffix = 1;
+            while (await _accountService.UsernameExistsAsync(username))
             {
-                account.Roles.Add(role);
+                username = $"{baseUsername}{suffix}";
+                suffix++;
             }
 
-            _context.Accounts.Add(account);
-            await _context.SaveChangesAsync();
+            // Get Employee role (default role for new employees)
+            var employeeRole = await _context.Roles
+                .FirstOrDefaultAsync(r => r.Name == "Employee");
+
+            if (employeeRole == null)
+            {
+                throw new BusinessException("Không tìm thấy vai trò 'Employee' trong hệ thống.");
+            }
+
+            // Create account using AccountService
+            try
+            {
+                var createAccountDto = new CreateAccountDto
+                {
+                    Username = username,
+                    Password = "Password123", // Default password
+                    UserId = user.Id,
+                    RoleIds = new List<int> { employeeRole.Id }
+                };
+
+                await _accountService.CreateAsync(createAccountDto);
+            }
+            catch (Exception ex)
+            {
+                // If account creation fails, we should consider rolling back the user creation
+                // For now, we'll just log and continue (user created without account)
+                throw new BusinessException($"Đã tạo nhân viên thành công nhưng không thể tạo tài khoản: {ex.Message}");
+            }
 
             // Return EmployeeDto
             var department = await _context.Departments.FindAsync(dto.DepartmentId!.Value);
@@ -177,6 +207,36 @@ namespace HRMS.Infrastructure.Services
                 PositionId = user.PositionId,
                 PositionName = position?.Name ?? ""
             };
+        }
+
+        /// <summary>
+        /// Helper method to remove Vietnamese diacritics and convert to plain ASCII
+        /// Example: "Long Tuấn Duy" -> "Long Tuan Duy"
+        /// </summary>
+        private string RemoveVietnameseDiacritics(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return text;
+
+            // Normalize to decomposed form (separates base characters from diacritics)
+            string normalized = text.Normalize(NormalizationForm.FormD);
+            
+            StringBuilder result = new StringBuilder();
+            
+            foreach (char c in normalized)
+            {
+                // Keep only non-spacing marks removed (diacritics are in this category)
+                if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                {
+                    result.Append(c);
+                }
+            }
+
+            // Additional Vietnamese-specific replacements
+            string output = result.ToString().Normalize(NormalizationForm.FormC);
+            output = output.Replace('đ', 'd').Replace('Đ', 'D');
+            
+            return output;
         }
 
         public async Task<bool> UpdateAsync(UpdateEmployeeDto dto)

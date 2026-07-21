@@ -28,10 +28,58 @@
     {
         <div class="card" style="background: rgba(20, 23, 38, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;">
             <div class="card-body">
+                <!-- Filter Section -->
+                <div class="row mb-4" style="background: rgba(30, 41, 59, 0.3); padding: 1.25rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" style="color: #cbd5e1; font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-search me-1"></i>Tìm kiếm
+                        </label>
+                        <input type="text" class="form-control" @bind="searchKeyword" @bind:event="oninput" 
+                               placeholder="Username, nhân viên, email..." 
+                               style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #e2e8f0;" />
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label" style="color: #cbd5e1; font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-shield-check me-1"></i>Vai trò
+                        </label>
+                        <select class="form-select" @bind="filterRoleId" 
+                                style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #e2e8f0;">
+                            <option value="">-- Tất cả vai trò --</option>
+                            @if (roles != null)
+                            {
+                                @foreach (var role in roles)
+                                {
+                                    <option value="@role.Id">@role.Name</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label" style="color: #cbd5e1; font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-toggle-on me-1"></i>Trạng thái
+                        </label>
+                        <select class="form-select" @bind="filterStatus" 
+                                style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #e2e8f0;">
+                            <option value="">-- Tất cả --</option>
+                            <option value="true">Hoạt động</option>
+                            <option value="false">Khóa</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 mb-3 d-flex align-items-end">
+                        <button class="btn btn-secondary w-100" @onclick="ClearFilters" 
+                                style="background: rgba(71, 85, 105, 0.3); border: 1px solid rgba(148, 163, 184, 0.3); color: #cbd5e1;">
+                            <i class="bi bi-x-circle me-1"></i>Xóa bộ lọc
+                        </button>
+                    </div>
+                </div>
+
                 <div class="mb-3">
                     <button class="btn btn-primary" @onclick="ShowCreateModal">
                         <i class="bi bi-plus-circle me-2"></i>Thêm tài khoản mới
                     </button>
+                    <span class="ms-3" style="color: #94a3b8; font-size: 0.9rem;">
+                        Tổng số: <strong style="color: #60a5fa;">@filteredAccounts.Count()</strong> tài khoản
+                    </span>
                 </div>
                 
                 <div class="table-responsive">
@@ -48,7 +96,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var acc in accounts)
+                            @foreach (var acc in filteredAccounts)
                             {
                                 <tr>
                                     <td style="color: #60a5fa; font-weight: 500;">@acc.Username</td>
@@ -160,6 +208,7 @@
     private List<AccountDto>? accounts;
     private List<EmployeeDto> employeeList = new();
     private List<RoleDto> roleList = new();
+    private List<RoleDto> roles = new();
     
     private string message = string.Empty;
     private string alertClass = "success";
@@ -175,6 +224,55 @@
     private int resetPasswordAccountId = 0;
     private int deleteAccountId = 0;
 
+    // Filter variables
+    private string searchKeyword = string.Empty;
+    private string filterRoleId = string.Empty;
+    private string filterStatus = string.Empty;
+
+    // Computed property for filtered accounts
+    private IEnumerable<AccountDto> filteredAccounts
+    {
+        get
+        {
+            if (accounts == null)
+                return Enumerable.Empty<AccountDto>();
+
+            var result = accounts.AsEnumerable();
+
+            // Search keyword filter
+            if (!string.IsNullOrWhiteSpace(searchKeyword))
+            {
+                var keyword = searchKeyword.Trim().ToLower();
+                result = result.Where(a =>
+                    (a.Username?.ToLower().Contains(keyword) ?? false) ||
+                    (a.FullName?.ToLower().Contains(keyword) ?? false) ||
+                    (a.EmailCompany?.ToLower().Contains(keyword) ?? false) ||
+                    (a.EmployeeCode?.ToLower().Contains(keyword) ?? false)
+                );
+            }
+
+            // Role filter
+            if (!string.IsNullOrWhiteSpace(filterRoleId))
+            {
+                if (int.TryParse(filterRoleId, out int roleId))
+                {
+                    result = result.Where(a => a.RoleIds.Contains(roleId));
+                }
+            }
+
+            // Status filter
+            if (!string.IsNullOrWhiteSpace(filterStatus))
+            {
+                if (bool.TryParse(filterStatus, out bool status))
+                {
+                    result = result.Where(a => a.Status == status);
+                }
+            }
+
+            return result;
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
@@ -187,12 +285,20 @@
             accounts = await AccountService.GetAllAsync();
             employeeList = await EmployeeService.GetEmployeesWithDetailsAsync();
             roleList = await RoleService.GetAllAsync();
+            roles = roleList; // Populate roles for dropdown
         }
         catch (Exception ex)
         {
             message = $"Lỗi tải dữ liệu: {ex.Message}";
             alertClass = "danger";
         }
+    }
+
+    private void ClearFilters()
+    {
+        searchKeyword = string.Empty;
+        filterRoleId = string.Empty;
+        filterStatus = string.Empty;
     }
 
     // Create
@@ -303,7 +409,7 @@
             bool success = await AccountService.ResetPasswordAsync(resetPasswordAccountId);
             if (success)
             {
-                message = "Đã reset mật khẩu về 'Password@123' thành công!";
+                message = "Đã reset mật khẩu về 'Password123' thành công!";
                 alertClass = "success";
                 showResetPasswordModal = false;
             }
