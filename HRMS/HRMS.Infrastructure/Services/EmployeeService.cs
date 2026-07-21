@@ -158,6 +158,19 @@ namespace HRMS.Infrastructure.Services
             _context.Accounts.Add(account);
             await _context.SaveChangesAsync();
 
+            // Initialize LeaveBalance for the current year
+            var currentYear = DateTime.Now.Year;
+            var leaveBalance = new LeaveBalance
+            {
+                UserId = user.Id,
+                Year = currentYear,
+                TotalDays = 12,
+                UsedDays = 0,
+                RemainingDays = 12
+            };
+            _context.LeaveBalances.Add(leaveBalance);
+            await _context.SaveChangesAsync();
+
             // Return EmployeeDto
             var department = await _context.Departments.FindAsync(dto.DepartmentId!.Value);
             var position = await _context.Positions.FindAsync(dto.PositionId!.Value);

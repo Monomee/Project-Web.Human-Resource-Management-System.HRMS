@@ -20,7 +20,7 @@ public class PayrollService : IPayrollService
 
     public async Task<bool> CalculateMonthlyPayrollAsync(int periodId)
     {
-        // 1. Kiểm tra kỳ công
+        // Kiểm tra kỳ công
         var period = await _db.TimesheetPeriods.FirstOrDefaultAsync(p => p.Id == periodId);
         if (period == null)
         {
@@ -32,19 +32,19 @@ public class PayrollService : IPayrollService
             throw new InvalidOperationException("Kỳ công này chưa được khóa sổ! Vui lòng khóa kỳ công trước khi tính lương.");
         }
 
-        // 2. Lấy danh sách nhân viên đang hoạt động
+        // Lấy danh sách nhân viên đang hoạt động
         var users = await _db.Users.Where(u => u.Status).ToListAsync();
         if (!users.Any())
         {
             return true;
         }
 
-        // 3. Lấy hợp đồng lao động "Active" của các nhân viên
+        // Lấy hợp đồng lao động "Active" của các nhân viên
         var activeContracts = await _db.EmploymentContracts
             .Where(c => c.Status == "Active")
             .ToDictionaryAsync(c => c.UserId);
 
-        // 4. Lấy nhật ký chấm công trong kỳ
+        // Lấy nhật ký chấm công trong kỳ
         var attendanceLogs = await _db.AttendanceLogs
             .Where(log => log.PeriodId == periodId)
             .ToListAsync();
@@ -57,7 +57,7 @@ public class PayrollService : IPayrollService
                 g => g.Select(log => log.CheckedAt.Date).Distinct().Count()
             );
 
-        // 5. Lấy đơn từ được phê duyệt trong khoảng thời gian kỳ công
+        // Lấy đơn từ được phê duyệt trong khoảng thời gian kỳ công
         var periodStart = period.StartDate.ToDateTime(TimeOnly.MinValue);
         var periodEnd = period.EndDate.ToDateTime(TimeOnly.MaxValue);
 
@@ -94,7 +94,7 @@ public class PayrollService : IPayrollService
                 standardWorkingDays++;
             }
         }
-        if (standardWorkingDays <= 0) standardWorkingDays = 26; // Cận dưới an toàn làm giá trị mặc định
+        if (standardWorkingDays <= 0) standardWorkingDays = 26; 
 
         var payslips = new List<Payslip>();
 
@@ -117,7 +117,6 @@ public class PayrollService : IPayrollService
             // Lấy giờ OT
             otHoursDict.TryGetValue(user.Id, out decimal hOt);
 
-            // 6. THỰC HIỆN TÍNH TOÁN
             // Đơn giá ngày công = BaseSalary / StandardWorkingDays
             decimal dailyRate = Math.Round(baseSalary / (decimal)standardWorkingDays, 0, MidpointRounding.AwayFromZero);
 
@@ -212,7 +211,6 @@ public class PayrollService : IPayrollService
         using var transaction = await _db.Database.BeginTransactionAsync();
         try
         {
-            // 8. Lưu dữ liệu (Idempotent: xóa các phiếu lương cũ trước khi lưu mới)
             var oldPayslips = await _db.Payslips.Where(p => p.PeriodId == periodId).ToListAsync();
             if (oldPayslips.Any())
             {

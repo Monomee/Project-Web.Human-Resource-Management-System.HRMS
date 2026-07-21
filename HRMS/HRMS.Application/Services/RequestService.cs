@@ -122,8 +122,20 @@ namespace HRMS.Application.Services
 
             var year = start.Year;
             var balance = await _db.LeaveBalances
-                .FirstOrDefaultAsync(b => b.UserId == userId && b.Year == year)
-                ?? throw new RequestWorkflowException($"Không tìm thấy dữ liệu phép năm {year} cho nhân viên này.");
+                .FirstOrDefaultAsync(b => b.UserId == userId && b.Year == year);
+            if (balance == null)
+            {
+                balance = new LeaveBalance
+                {
+                    UserId = userId,
+                    Year = year,
+                    TotalDays = 12,
+                    UsedDays = 0,
+                    RemainingDays = 12
+                };
+                _db.LeaveBalances.Add(balance);
+                await _db.SaveChangesAsync();
+            }
 
             var pendingDays = await _db.Requests
                 .Where(r => r.CreatedByAccountId == model.AccountId 
@@ -213,8 +225,20 @@ namespace HRMS.Application.Services
 
                     var year = entity.StartDate.Year;
                     var balance = await _db.LeaveBalances
-                        .FirstOrDefaultAsync(b => b.UserId == account.UserId && b.Year == year)
-                        ?? throw new RequestWorkflowException($"Không tìm thấy dữ liệu phép năm {year} cho nhân viên này.");
+                        .FirstOrDefaultAsync(b => b.UserId == account.UserId && b.Year == year);
+                    if (balance == null)
+                    {
+                        balance = new LeaveBalance
+                        {
+                            UserId = account.UserId,
+                            Year = year,
+                            TotalDays = 12,
+                            UsedDays = 0,
+                            RemainingDays = 12
+                        };
+                        _db.LeaveBalances.Add(balance);
+                        await _db.SaveChangesAsync();
+                    }
 
                     var days = (int)entity.Value;
 
