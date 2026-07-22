@@ -330,7 +330,6 @@
 
     protected override void OnInitialized()
     {
-        // Nhận lỗi từ Query String (nếu có) khi chuyển hướng từ Endpoint phụ trợ
         var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
         if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("error", out var errorMsg))
         {

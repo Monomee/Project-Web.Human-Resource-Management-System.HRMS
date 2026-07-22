@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 
 namespace HRMS.Application.DTOs;
-
+//
 public class AuthResult
 {
     public bool Success { get; set; }
