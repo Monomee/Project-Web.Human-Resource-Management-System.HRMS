@@ -9,7 +9,7 @@
 @inject IContractService ContractService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,HRM,HR")]
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,Executive,HRM,HR,Manager")]
 
 <PageTitle>Chi tiết Nhân viên</PageTitle>
 
@@ -158,19 +158,19 @@
                     <span>Lịch sử Hợp đồng Lao động</span>
                     <span class="badge-contract-count ms-2">@employee.Contracts.Count hợp đồng</span>
                 </div>
-                <!-- Authorization: HR and HRM can create contract -->
-                <AuthorizeView Roles="HR,HRM">
-                    <Authorized>
-                        <button class="btn-add-contract" @onclick="OpenCreateContractModal">
-                            <i class="bi bi-plus-circle me-2"></i>Thêm hợp đồng mới
-                        </button>
-                    </Authorized>
-                    <NotAuthorized>
-                        <button class="btn-add-contract" disabled title="Chỉ HR/HRM mới có quyền tạo hợp đồng">
-                            <i class="bi bi-lock-fill me-2"></i>Thêm hợp đồng mới
-                        </button>
-                    </NotAuthorized>
-                </AuthorizeView>
+                <!-- Only Admin can create contract -->
+                @if (isAdmin)
+                {
+                    <button class="btn-add-contract" @onclick="OpenCreateContractModal">
+                        <i class="bi bi-plus-circle me-2"></i>Thêm hợp đồng mới
+                    </button>
+                }
+                else
+                {
+                    <span class="badge" style="background: rgba(100, 116, 139, 0.5); color: #cbd5e1; padding: 0.5rem 1rem; font-size: 0.9rem;">
+                        <i class="bi bi-eye me-1"></i>Chế độ xem
+                    </span>
+                }
             </div>
             <div class="card-body-dark">
                 @if (!employee.Contracts.Any())
@@ -241,60 +241,58 @@
                                         <td class="text-center">
                                             @if (contract.Status == "Pending")
                                             {
-                                                <!-- Pending: Show Edit (HR, HRM), Approve (HRM), Reject (HRM) -->
-                                                <div class="btn-action-group">
-                                                    <AuthorizeView Roles="HR,HRM">
-                                                        <Authorized>
-                                                            <button class="btn-edit-contract" @onclick="() => OpenEditContractModal(contract)" title="Chỉnh sửa hợp đồng">
-                                                                <i class="bi bi-pencil-fill"></i>
-                                                            </button>
-                                                        </Authorized>
-                                                    </AuthorizeView>
-                                                    
-                                                    <AuthorizeView Roles="HRM">
-                                                        <Authorized>
-                                                            <button class="btn-approve-contract" @onclick="() => OpenApproveModal(contract)" title="Phê duyệt">
-                                                                <i class="bi bi-check-circle-fill"></i>
-                                                            </button>
-                                                            <button class="btn-reject-contract" @onclick="() => OpenRejectModal(contract)" title="Từ chối">
-                                                                <i class="bi bi-x-circle-fill"></i>
-                                                            </button>
-                                                        </Authorized>
-                                                    </AuthorizeView>
-                                                </div>
-                                            }
-                                            else if (contract.Status == "Rejected")
-                                            {
-                                                <!-- Rejected: Show Edit (HR, HRM) -->
-                                                <AuthorizeView Roles="HR,HRM">
-                                                    <Authorized>
+                                                <!-- Pending: Only Admin can Edit, Approve, Reject -->
+                                                @if (isAdmin)
+                                                {
+                                                    <div class="btn-action-group">
                                                         <button class="btn-edit-contract" @onclick="() => OpenEditContractModal(contract)" title="Chỉnh sửa hợp đồng">
                                                             <i class="bi bi-pencil-fill"></i>
                                                         </button>
-                                                    </Authorized>
-                                                    <NotAuthorized>
-                                                        <span class="text-muted-dark">—</span>
-                                                    </NotAuthorized>
-                                                </AuthorizeView>
+                                                        <button class="btn-approve-contract" @onclick="() => OpenApproveModal(contract)" title="Phê duyệt">
+                                                            <i class="bi bi-check-circle-fill"></i>
+                                                        </button>
+                                                        <button class="btn-reject-contract" @onclick="() => OpenRejectModal(contract)" title="Từ chối">
+                                                            <i class="bi bi-x-circle-fill"></i>
+                                                        </button>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted-dark">Chỉ xem</span>
+                                                }
+                                            }
+                                            else if (contract.Status == "Rejected")
+                                            {
+                                                <!-- Rejected: Only Admin can Edit -->
+                                                @if (isAdmin)
+                                                {
+                                                    <button class="btn-edit-contract" @onclick="() => OpenEditContractModal(contract)" title="Chỉnh sửa hợp đồng">
+                                                        <i class="bi bi-pencil-fill"></i>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted-dark">Chỉ xem</span>
+                                                }
                                             }
                                             else if (contract.Status == "Active")
                                             {
-                                                <!-- Active: Show Deactivate and Terminate (HR, HRM) -->
-                                                <AuthorizeView Roles="HR,HRM">
-                                                    <Authorized>
-                                                        <div class="btn-action-group">
-                                                            <button class="btn-deactivate-contract" @onclick="() => OpenDeactivateModal(contract)" title="Vô hiệu hóa hợp đồng">
-                                                                <i class="bi bi-pause-circle-fill"></i>
-                                                            </button>
-                                                            <button class="btn-terminate-contract" @onclick="() => OpenTerminateModal(contract)" title="Chấm dứt hợp đồng">
-                                                                <i class="bi bi-stop-circle-fill"></i>
-                                                            </button>
-                                                        </div>
-                                                    </Authorized>
-                                                    <NotAuthorized>
-                                                        <span class="text-muted-dark">—</span>
-                                                    </NotAuthorized>
-                                                </AuthorizeView>
+                                                <!-- Active: Only Admin can Deactivate and Terminate -->
+                                                @if (isAdmin)
+                                                {
+                                                    <div class="btn-action-group">
+                                                        <button class="btn-deactivate-contract" @onclick="() => OpenDeactivateModal(contract)" title="Vô hiệu hóa hợp đồng">
+                                                            <i class="bi bi-pause-circle-fill"></i>
+                                                        </button>
+                                                        <button class="btn-terminate-contract" @onclick="() => OpenTerminateModal(contract)" title="Chấm dứt hợp đồng">
+                                                            <i class="bi bi-stop-circle-fill"></i>
+                                                        </button>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted-dark">Chỉ xem</span>
+                                                }
                                             }
                                             else
                                             {
@@ -575,9 +573,39 @@
     private string terminateReason = string.Empty;
     private string deactivateReason = string.Empty;
 
+    // Current user role tracking
+    private string currentUserRole = string.Empty;
+    private bool isAdmin = false;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadEmployeeDetail();
+        await LoadCurrentUser();
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                // Get Role
+                var roleClaim = user.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role);
+                if (roleClaim != null)
+                {
+                    currentUserRole = roleClaim.Value;
+                    isAdmin = (currentUserRole == "Admin");
+                }
+            }
+        }
+        catch
+        {
+            currentUserRole = string.Empty;
+            isAdmin = false;
+        }
     }
 
     private async Task LoadEmployeeDetail()

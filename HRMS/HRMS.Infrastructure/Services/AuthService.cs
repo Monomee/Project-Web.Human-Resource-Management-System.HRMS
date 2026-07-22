@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using HRMS.Application.Interfaces;
 using HRMS.Application.DTOs;
 using HRMS.Infrastructure.Persistence;
@@ -11,10 +12,12 @@ namespace HRMS.Infrastructure.Services;
 public class AuthService : IAuthService
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IConfiguration _configuration;
 
-    public AuthService(ApplicationDbContext dbContext)
+    public AuthService(ApplicationDbContext dbContext, IConfiguration configuration)
     {
         _dbContext = dbContext;
+        _configuration = configuration;
     }
 
     public async Task<AuthResult> LoginAsync(string username, string password)
@@ -28,7 +31,27 @@ public class AuthService : IAuthService
             };
         }
 
-        // Tìm kiếm Account kết nối với bảng Users và Roles
+        // PRIORITY 1: Check Admin account from appsettings (hardcoded, not in database)
+        var adminUsername = _configuration["AdminAccount:Username"];
+        var adminPassword = _configuration["AdminAccount:Password"];
+        var adminFullName = _configuration["AdminAccount:FullName"] ?? "System Administrator";
+
+        if (!string.IsNullOrEmpty(adminUsername) && 
+            !string.IsNullOrEmpty(adminPassword) &&
+            username == adminUsername && 
+            password == adminPassword)
+        {
+            // Admin login successful
+            return new AuthResult
+            {
+                Success = true,
+                AccountId = -1, // Special ID for admin (not in database)
+                FullName = adminFullName,
+                Roles = new List<string> { "Admin" }
+            };
+        }
+
+        // PRIORITY 2: Check regular accounts from database
         var account = await _dbContext.Accounts
             .Include(a => a.User)
             .Include(a => a.Roles)

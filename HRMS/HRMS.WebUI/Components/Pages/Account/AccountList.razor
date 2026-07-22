@@ -3,7 +3,9 @@
 @inject IAccountService AccountService
 @inject IEmployeeService EmployeeService  
 @inject IRoleService RoleService
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,HRM,HR")]
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthProvider
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,Executive,HRM,HR,Manager")]
 
 <PageTitle>Quản lý Tài khoản</PageTitle>
 
@@ -74,11 +76,20 @@
                 </div>
 
                 <div class="mb-3">
-                    <button class="btn btn-primary" @onclick="ShowCreateModal">
-                        <i class="bi bi-plus-circle me-2"></i>Thêm tài khoản mới
-                    </button>
+                    @if (isAdmin)
+                    {
+                        <button class="btn btn-primary" @onclick="ShowCreateModal">
+                            <i class="bi bi-plus-circle me-2"></i>Thêm tài khoản mới
+                        </button>
+                    }
                     <span class="ms-3" style="color: #94a3b8; font-size: 0.9rem;">
                         Tổng số: <strong style="color: #60a5fa;">@filteredAccounts.Count()</strong> tài khoản
+                        @if (!isAdmin)
+                        {
+                            <span class="badge" style="background: rgba(100, 116, 139, 0.5); color: #cbd5e1; margin-left: 0.5rem;">
+                                <i class="bi bi-eye me-1"></i>Chế độ xem
+                            </span>
+                        }
                     </span>
                 </div>
                 
@@ -120,15 +131,24 @@
                                         }
                                     </td>
                                     <td class="text-center">
-                                        <button class="btn btn-sm btn-info me-1" @onclick="() => ShowEditModal(acc.Id)" title="Sửa">
-                                            <i class="bi bi-pencil-fill"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-warning me-1" @onclick="() => ShowResetPasswordConfirmation(acc.Id)" title="Reset mật khẩu">
-                                            <i class="bi bi-arrow-clockwise"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-danger" @onclick="() => ShowDeleteConfirmation(acc.Id)" title="Xóa">
-                                            <i class="bi bi-trash-fill"></i>
-                                        </button>
+                                        @if (isAdmin)
+                                        {
+                                            <button class="btn btn-sm btn-info me-1" @onclick="() => ShowEditModal(acc.Id)" title="Sửa">
+                                                <i class="bi bi-pencil-fill"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-warning me-1" @onclick="() => ShowResetPasswordConfirmation(acc.Id)" title="Reset mật khẩu">
+                                                <i class="bi bi-arrow-clockwise"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" @onclick="() => ShowDeleteConfirmation(acc.Id)" title="Xóa">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted" style="font-size: 0.85rem;">
+                                                <i class="bi bi-eye-slash me-1"></i>Chỉ xem
+                                            </span>
+                                        }
                                     </td>
                                 </tr>
                             }
@@ -224,6 +244,11 @@
     private int resetPasswordAccountId = 0;
     private int deleteAccountId = 0;
 
+    // Current user
+    private int currentAccountId = 0;
+    private string currentUserRole = string.Empty;
+    private bool isAdmin = false;
+
     // Filter variables
     private string searchKeyword = string.Empty;
     private string filterRoleId = string.Empty;
@@ -276,6 +301,40 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
+        await LoadCurrentUser();
+    }
+    
+    private async Task LoadCurrentUser()
+    {
+        try
+        {
+            var authState = await AuthProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                // Get AccountId
+                var accountIdClaim = user.Claims.FirstOrDefault(c => c.Type == "AccountId");
+                if (accountIdClaim != null && int.TryParse(accountIdClaim.Value, out int accId))
+                {
+                    currentAccountId = accId;
+                }
+                
+                // Get Role
+                var roleClaim = user.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role);
+                if (roleClaim != null)
+                {
+                    currentUserRole = roleClaim.Value;
+                    isAdmin = (currentUserRole == "Admin");
+                }
+            }
+        }
+        catch
+        {
+            currentAccountId = 0;
+            currentUserRole = string.Empty;
+            isAdmin = false;
+        }
     }
 
     private async Task LoadData()

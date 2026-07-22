@@ -358,6 +358,7 @@
             // Tạo danh sách Claims từ kết quả đăng nhập thành công
             var claims = new List<Claim>
             {
+                new Claim("AccountId", authResult.AccountId.ToString()), // For self-edit detection
                 new Claim(ClaimTypes.NameIdentifier, authResult.AccountId.ToString()),
                 new Claim(ClaimTypes.Name, authResult.FullName)
             };

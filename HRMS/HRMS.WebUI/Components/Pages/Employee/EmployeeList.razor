@@ -11,7 +11,8 @@
 @inject NavigationManager Navigation
 @inject IAuthService AuthService
 @inject IJSRuntime JS
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,HRM,HR")]
+@inject AuthenticationStateProvider AuthProvider
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,Executive,HRM,HR,Manager")]
 
 <PageTitle>Danh sách Nhân viên</PageTitle>
 
@@ -86,9 +87,18 @@
             </div>
 
             <div class="toolbar-right">
-                <button class="btn-add-new" @onclick="AddNewEmployee">
-                    <i class="bi bi-plus-circle me-2"></i>Thêm nhân viên mới
-                </button>
+                @if (isAdmin)
+                {
+                    <button class="btn-add-new" @onclick="AddNewEmployee">
+                        <i class="bi bi-plus-circle me-2"></i>Thêm nhân viên mới
+                    </button>
+                }
+                @if (!isAdmin)
+                {
+                    <span class="badge" style="background: rgba(100, 116, 139, 0.5); color: #cbd5e1; padding: 0.5rem 1rem; font-size: 0.9rem;">
+                        <i class="bi bi-eye me-1"></i>Chế độ xem
+                    </span>
+                }
             </div>
         </div>
 
@@ -162,24 +172,33 @@
                                                 title="Xem chi tiết">
                                             <i class="bi bi-eye-fill"></i>
                                         </button>
-                                        <button class="icon-btn icon-edit" 
-                                                @onclick="() => EditEmployee(emp.Id)"
-                                                title="Chỉnh sửa">
-                                            <i class="bi bi-pencil-fill"></i>
-                                        </button>
-                                        <button class="icon-btn icon-pause" 
-                                                @onclick="() => ToggleStatus(emp)" 
-                                                disabled="@(isProcessing && processingUserId == emp.Id)"
-                                                title="@(emp.Status ? "Tạm dừng" : "Kích hoạt")">
-                                            @if (isProcessing && processingUserId == emp.Id)
-                                            {
-                                                <span class="spinner-border spinner-border-sm"></span>
-                                            }
-                                            else
-                                            {
-                                                <i class="bi bi-pause-circle-fill"></i>
-                                            }
-                                        </button>
+                                        @if (isAdmin)
+                                        {
+                                            <button class="icon-btn icon-edit" 
+                                                    @onclick="() => EditEmployee(emp.Id)"
+                                                    title="Chỉnh sửa">
+                                                <i class="bi bi-pencil-fill"></i>
+                                            </button>
+                                            <button class="icon-btn icon-pause" 
+                                                    @onclick="() => ToggleStatus(emp)" 
+                                                    disabled="@(isProcessing && processingUserId == emp.Id)"
+                                                    title="@(emp.Status ? "Tạm dừng" : "Kích hoạt")">
+                                                @if (isProcessing && processingUserId == emp.Id)
+                                                {
+                                                    <span class="spinner-border spinner-border-sm"></span>
+                                                }
+                                                else
+                                                {
+                                                    <i class="bi bi-pause-circle-fill"></i>
+                                                }
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted" style="font-size: 0.85rem;">
+                                                <i class="bi bi-eye-slash me-1"></i>Chỉ xem
+                                            </span>
+                                        }
                                     </div>
                                 </td>
                             </tr>
@@ -354,10 +373,40 @@
     private List<PositionDto> positionList = new();
     private List<RoleDto> roleList = new();
 
+    // Current user role tracking
+    private string currentUserRole = string.Empty;
+    private bool isAdmin = false;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadEmployees();
         await LoadDropdownData();
+        await LoadCurrentUser();
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        try
+        {
+            var authState = await AuthProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                // Get Role
+                var roleClaim = user.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role);
+                if (roleClaim != null)
+                {
+                    currentUserRole = roleClaim.Value;
+                    isAdmin = (currentUserRole == "Admin");
+                }
+            }
+        }
+        catch
+        {
+            currentUserRole = string.Empty;
+            isAdmin = false;
+        }
     }
 
     private async Task LoadEmployees()
