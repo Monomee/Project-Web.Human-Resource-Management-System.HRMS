@@ -162,4 +162,22 @@ public class TimePeriodService : ITimePeriodService
 
         await _db.SaveChangesAsync();
     }
+
+    public async Task LockPeriodAsync(int id)
+    {
+        var period = await _db.TimesheetPeriods.FindAsync(id)
+            ?? throw new InvalidOperationException($"Không tìm thấy kỳ công ID={id}.");
+
+        period.IsLocked = true;
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task UnlockPeriodAsync(int id)
+    {
+        var period = await _db.TimesheetPeriods.FindAsync(id)
+            ?? throw new InvalidOperationException($"Không tìm thấy kỳ công ID={id}.");
+
+        period.IsLocked = false;
+        await _db.SaveChangesAsync();
+    }
 }

@@ -38,4 +38,14 @@ public interface ITimePeriodService
     /// <param name="id">Id của kỳ công cần sửa.</param>
     /// <param name="dto">Dữ liệu mới.</param>
     Task UpdateAsync(int id, UpdateTimesheetPeriodDto dto);
+
+    /// <summary>
+    /// Khóa kỳ công (IsLocked = true).
+    /// </summary>
+    Task LockPeriodAsync(int id);
+
+    /// <summary>
+    /// Mở khóa kỳ công (IsLocked = false).
+    /// </summary>
+    Task UnlockPeriodAsync(int id);
 }

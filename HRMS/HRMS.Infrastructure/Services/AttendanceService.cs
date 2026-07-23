@@ -140,6 +140,11 @@ public class AttendanceService : IAttendanceService
             throw new InvalidOperationException($"Nhân viên ID={userId} đã thực hiện Check-Out ngày {date:dd/MM/yyyy} rồi.");
         }
 
+        if (checkOutTime <= attendance.CheckInTime.Value)
+        {
+            throw new InvalidOperationException($"Giờ Check-Out ({checkOutTime:HH:mm}) phải lớn hơn giờ Check-In ({attendance.CheckInTime.Value:HH:mm}).");
+        }
+
         attendance.CheckOutTime = checkOutTime;
         await _db.SaveChangesAsync();
     }
@@ -282,8 +287,20 @@ public class AttendanceService : IAttendanceService
 
     public async Task UpdateAttendanceAsync(int id, TimeOnly? checkInTime, TimeOnly? checkOutTime)
     {
-        var attendance = await _db.Attendances.FindAsync(id)
+        var attendance = await _db.Attendances
+            .Include(a => a.Period)
+            .FirstOrDefaultAsync(a => a.Id == id)
             ?? throw new InvalidOperationException($"Không tìm thấy bản ghi chấm công ID={id}.");
+
+        if (attendance.Period != null && attendance.Period.IsLocked)
+        {
+            throw new InvalidOperationException($"Kỳ công '{attendance.Period.Name}' đã bị khóa sổ. Không thể chỉnh sửa giờ chấm công.");
+        }
+
+        if (checkInTime.HasValue && checkOutTime.HasValue && checkOutTime.Value <= checkInTime.Value)
+        {
+            throw new InvalidOperationException($"Giờ Check-Out ({checkOutTime.Value:HH:mm}) phải lớn hơn giờ Check-In ({checkInTime.Value:HH:mm}).");
+        }
 
         attendance.CheckInTime = checkInTime;
         attendance.CheckOutTime = checkOutTime;
@@ -315,9 +332,11 @@ public class AttendanceService : IAttendanceService
 
     public async Task<ShiftDto> CreateShiftAsync(CreateShiftDto dto)
     {
+        ValidateShiftDto(dto);
+
         var shift = new Shift
         {
-            Name = dto.Name,
+            Name = dto.Name.Trim(),
             StartTime = dto.StartTime,
             EndTime = dto.EndTime,
             BreakStart = dto.BreakStart,
@@ -348,10 +367,12 @@ public class AttendanceService : IAttendanceService
 
     public async Task UpdateShiftAsync(UpdateShiftDto dto)
     {
+        ValidateShiftDto(dto);
+
         var shift = await _db.Shifts.FindAsync(dto.Id)
             ?? throw new InvalidOperationException($"Không tìm thấy Ca làm việc ID={dto.Id}.");
 
-        shift.Name = dto.Name;
+        shift.Name = dto.Name.Trim();
         shift.StartTime = dto.StartTime;
         shift.EndTime = dto.EndTime;
         shift.BreakStart = dto.BreakStart;
@@ -362,6 +383,30 @@ public class AttendanceService : IAttendanceService
         shift.IsActive = dto.IsActive;
 
         await _db.SaveChangesAsync();
+    }
+
+    private static void ValidateShiftDto(CreateShiftDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Name))
+        {
+            throw new InvalidOperationException("Tên Ca làm việc không được để trống.");
+        }
+        if (dto.EndTime <= dto.StartTime)
+        {
+            throw new InvalidOperationException("Giờ Kết thúc ca làm việc phải lớn hơn giờ Bắt đầu.");
+        }
+        if (dto.BreakEnd <= dto.BreakStart)
+        {
+            throw new InvalidOperationException("Giờ Kết thúc nghỉ trưa phải lớn hơn giờ Bắt đầu nghỉ trưa.");
+        }
+        if (dto.BreakStart < dto.StartTime || dto.BreakEnd > dto.EndTime)
+        {
+            throw new InvalidOperationException("Khoảng thời gian nghỉ trưa phải nằm trong khoảng thời gian ca làm việc.");
+        }
+        if (dto.LateToleranceMinute < 0 || dto.EarlyCheckInMinute < 0 || dto.LateCheckOutMinute < 0)
+        {
+            throw new InvalidOperationException("Dung sai thời gian không được là số âm.");
+        }
     }
 
     public async Task DeleteShiftAsync(int shiftId)
@@ -399,6 +444,16 @@ public class AttendanceService : IAttendanceService
 
     public async Task AssignShiftAsync(CreateShiftAssignmentDto dto, int assignedByAccountId)
     {
+        if (dto.EmployeeId <= 0 || !await _db.Users.AnyAsync(u => u.Id == dto.EmployeeId))
+        {
+            throw new InvalidOperationException("Nhân viên không tồn tại trong hệ thống.");
+        }
+
+        if (dto.ShiftId <= 0 || !await _db.Shifts.AnyAsync(s => s.Id == dto.ShiftId && s.IsActive))
+        {
+            throw new InvalidOperationException("Ca làm việc không tồn tại hoặc đã bị vô hiệu hóa.");
+        }
+
         if (dto.EndDate < dto.StartDate)
         {
             throw new InvalidOperationException("Ngày kết thúc phân ca không thể nhỏ hơn ngày bắt đầu.");
@@ -451,6 +506,15 @@ public class AttendanceService : IAttendanceService
             ?? throw new InvalidOperationException($"Không tìm thấy kỳ công ID={periodId}.");
 
         period.IsLocked = true;
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task UnlockPeriodAsync(int periodId)
+    {
+        var period = await _db.TimesheetPeriods.FindAsync(periodId)
+            ?? throw new InvalidOperationException($"Không tìm thấy kỳ công ID={periodId}.");
+
+        period.IsLocked = false;
         await _db.SaveChangesAsync();
     }
 

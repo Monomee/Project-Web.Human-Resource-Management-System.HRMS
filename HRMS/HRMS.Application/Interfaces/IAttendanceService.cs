@@ -31,5 +31,6 @@ public interface IAttendanceService
     // Backward compatibility methods for TimesheetPeriod management & legacy Excel import
     Task<List<TimesheetPeriodDto>> GetPeriodsAsync();
     Task LockPeriodAsync(int periodId);
+    Task UnlockPeriodAsync(int periodId);
     Task<List<AttendanceImportResultDto>> ImportAndSaveAsync(Stream fileStream, int periodId);
 }

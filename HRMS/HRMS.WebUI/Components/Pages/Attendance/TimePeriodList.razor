@@ -31,6 +31,22 @@
         </a>
     </div>
 
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@_errorMessage
+            <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>@_successMessage
+            <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+        </div>
+    }
+
     @* ── BẢNG DANH SÁCH KỲ CÔNG ── *@
     @if (_isLoading)
     {
@@ -85,15 +101,24 @@
                             <td class="td-actions">
                                 @if (!p.IsLocked)
                                 {
-                                    <a class="btn-icon btn-edit"
+                                    <a class="btn-icon btn-edit me-1"
                                        title="Sửa kỳ công này"
                                        href="/attendance/periods/edit/@p.Id">
                                         ✏️ Sửa
                                     </a>
+                                    <button class="btn-icon btn-lock"
+                                            title="Khóa sổ kỳ công này"
+                                            @onclick="() => ToggleLockAsync(p, true)">
+                                        🔒 Khóa kỳ
+                                    </button>
                                 }
                                 else
                                 {
-                                    <span class="locked-hint" title="Kỳ đã khóa, không thể sửa">—</span>
+                                    <button class="btn-icon btn-unlock"
+                                            title="Mở khóa kỳ công này"
+                                            @onclick="() => ToggleLockAsync(p, false)">
+                                        🔓 Mở khóa
+                                    </button>
                                 }
                             </td>
                         </tr>
@@ -193,6 +218,10 @@
         transition: background 0.15s;
     }
     .btn-icon:hover { background: #dbeafe; }
+    .btn-lock { background: #fff1f2; border: 1px solid #fecdd3; color: #e11d48; }
+    .btn-lock:hover { background: #ffe4e6; }
+    .btn-unlock { background: #f0fdf4; border: 1px solid #bbf7d0; color: #16a34a; }
+    .btn-unlock:hover { background: #dcfce7; }
     .locked-hint    { color: #d1d5db; font-size: 0.85rem; }
 
     /* Buttons */
@@ -214,8 +243,10 @@
 </style>
 
 @code {
-    private List<TimesheetPeriodDto> _periods   = new();
-    private bool                      _isLoading = true;
+    private List<TimesheetPeriodDto> _periods = new();
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private string? _successMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -225,7 +256,31 @@
     private async Task LoadDataAsync()
     {
         _isLoading = true;
-        _periods   = await TimePeriodService.GetAllAsync();
+        _periods = await TimePeriodService.GetAllAsync();
         _isLoading = false;
+    }
+
+    private async Task ToggleLockAsync(TimesheetPeriodDto period, bool lockPeriod)
+    {
+        _errorMessage = null;
+        _successMessage = null;
+        try
+        {
+            if (lockPeriod)
+            {
+                await TimePeriodService.LockPeriodAsync(period.Id);
+                _successMessage = $"Đã khóa thành công kỳ công '{period.Name}'.";
+            }
+            else
+            {
+                await TimePeriodService.UnlockPeriodAsync(period.Id);
+                _successMessage = $"Đã mở khóa thành công kỳ công '{period.Name}'.";
+            }
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Lỗi xử lý khóa kỳ công: " + ex.Message;
+        }
     }
 }
