@@ -10,8 +10,9 @@ namespace HRMS.Application.Interfaces;
 public interface IAttendanceService
 {
     // Employee Check In & Check Out
-    Task CheckInAsync(int userId, DateOnly date, TimeOnly checkInTime);
-    Task CheckOutAsync(int userId, DateOnly date, TimeOnly checkOutTime);
+    DateOnly GetTodayDate();
+    Task CheckInAsync(int userId, DateOnly? date = null, TimeOnly? checkInTime = null);
+    Task CheckOutAsync(int userId, DateOnly? date = null, TimeOnly? checkOutTime = null);
     Task<AttendanceDetailDto?> GetTodayAttendanceAsync(int userId, DateOnly date);
     Task<List<AttendanceDetailDto>> GetAttendanceHistoryAsync(int? userId, DateOnly? startDate, DateOnly? endDate, int? departmentId = null, int? periodId = null);
     Task<AttendanceDetailDto?> GetAttendanceByIdAsync(int id);

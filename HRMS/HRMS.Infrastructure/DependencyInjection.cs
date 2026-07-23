@@ -41,6 +41,9 @@ namespace HRMS.Infrastructure
             // Đăng ký dịch vụ quản lý vai trò
             services.AddScoped<IRoleService, RoleService>();
 
+            // Đăng ký dịch vụ thời gian chống gian lận (Anti-tamper TimeProvider)
+            services.AddSingleton<ITimeProvider, DateTimeProvider>();
+
             // Đăng ký dịch vụ đọc file Excel (Task 3.3)
             services.AddScoped<IExcelParserService, ExcelParserService>();
 

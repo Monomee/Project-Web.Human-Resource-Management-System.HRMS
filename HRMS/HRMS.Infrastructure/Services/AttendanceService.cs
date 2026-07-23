@@ -31,11 +31,13 @@ public class AttendanceService : IAttendanceService
 
     private readonly ApplicationDbContext _db;
     private readonly IExcelParserService _excelParser;
+    private readonly ITimeProvider _timeProvider;
 
-    public AttendanceService(ApplicationDbContext db, IExcelParserService excelParser)
+    public AttendanceService(ApplicationDbContext db, IExcelParserService excelParser, ITimeProvider timeProvider)
     {
         _db = db;
         _excelParser = excelParser;
+        _timeProvider = timeProvider;
     }
 
     #region Shift Resolution Helper
@@ -59,14 +61,10 @@ public class AttendanceService : IAttendanceService
                 .ThenInclude(p => p.DefaultShift)
             .FirstOrDefaultAsync(u => u.Id == userId);
 
-        if (user?.Position?.DefaultShift != null && user.Position.DefaultShift.IsActive)
-        {
-            return user.Position.DefaultShift;
-        }
+        var defaultShift = await _db.Shifts
+            .FirstOrDefaultAsync(s => s.IsActive && s.Name.Contains("Hành Chính"));
 
-        // 3. Fallback: lấy Ca active đầu tiên trong DB hoặc ca chuẩn
-        var firstActiveShift = await _db.Shifts.FirstOrDefaultAsync(s => s.IsActive);
-        return firstActiveShift ?? FallbackDefaultShift;
+        return defaultShift ?? FallbackDefaultShift;
     }
 
     private async Task<int?> ResolvePeriodIdAsync(DateOnly date)
@@ -78,10 +76,21 @@ public class AttendanceService : IAttendanceService
     #endregion
 
     #region Employee Check-In & Check-Out
-    public async Task CheckInAsync(int userId, DateOnly date, TimeOnly checkInTime)
+    public DateOnly GetTodayDate() => _timeProvider.GetToday();
+
+    private DateTime GetServerNow()
     {
+        return _timeProvider.GetLocalNow();
+    }
+
+    public async Task CheckInAsync(int userId, DateOnly? date = null, TimeOnly? checkInTime = null)
+    {
+        var serverNow = GetServerNow();
+        var targetDate = date ?? DateOnly.FromDateTime(serverNow);
+        var targetCheckInTime = checkInTime ?? TimeOnly.FromDateTime(serverNow);
+
         var period = await _db.TimesheetPeriods
-            .FirstOrDefaultAsync(p => p.StartDate <= date && date <= p.EndDate);
+            .FirstOrDefaultAsync(p => p.StartDate <= targetDate && targetDate <= p.EndDate);
 
         if (period != null && period.IsLocked)
         {
@@ -89,11 +98,11 @@ public class AttendanceService : IAttendanceService
         }
 
         var attendance = await _db.Attendances
-            .FirstOrDefaultAsync(a => a.EmployeeId == userId && a.AttendanceDate == date);
+            .FirstOrDefaultAsync(a => a.EmployeeId == userId && a.AttendanceDate == targetDate);
 
         if (attendance != null && attendance.CheckInTime != null)
         {
-            throw new InvalidOperationException($"Nhân viên ID={userId} đã thực hiện Check-In ngày {date:dd/MM/yyyy} rồi.");
+            throw new InvalidOperationException($"Nhân viên ID={userId} đã thực hiện Check-In ngày {targetDate:dd/MM/yyyy} rồi.");
         }
 
         if (attendance == null)
@@ -101,15 +110,15 @@ public class AttendanceService : IAttendanceService
             attendance = new Attendance
             {
                 EmployeeId = userId,
-                AttendanceDate = date,
-                CheckInTime = checkInTime,
+                AttendanceDate = targetDate,
+                CheckInTime = targetCheckInTime,
                 PeriodId = period?.Id
             };
             await _db.Attendances.AddAsync(attendance);
         }
         else
         {
-            attendance.CheckInTime = checkInTime;
+            attendance.CheckInTime = targetCheckInTime;
             if (!attendance.PeriodId.HasValue)
             {
                 attendance.PeriodId = period?.Id;
@@ -119,15 +128,19 @@ public class AttendanceService : IAttendanceService
         await _db.SaveChangesAsync();
     }
 
-    public async Task CheckOutAsync(int userId, DateOnly date, TimeOnly checkOutTime)
+    public async Task CheckOutAsync(int userId, DateOnly? date = null, TimeOnly? checkOutTime = null)
     {
+        var serverNow = GetServerNow();
+        var targetDate = date ?? DateOnly.FromDateTime(serverNow);
+        var targetCheckOutTime = checkOutTime ?? TimeOnly.FromDateTime(serverNow);
+
         var attendance = await _db.Attendances
             .Include(a => a.Period)
-            .FirstOrDefaultAsync(a => a.EmployeeId == userId && a.AttendanceDate == date);
+            .FirstOrDefaultAsync(a => a.EmployeeId == userId && a.AttendanceDate == targetDate);
 
         if (attendance == null || attendance.CheckInTime == null)
         {
-            throw new InvalidOperationException($"Nhân viên ID={userId} chưa thực hiện Check-In ngày {date:dd/MM/yyyy}.");
+            throw new InvalidOperationException($"Nhân viên ID={userId} chưa thực hiện Check-In ngày {targetDate:dd/MM/yyyy}.");
         }
 
         if (attendance.Period != null && attendance.Period.IsLocked)
@@ -137,15 +150,15 @@ public class AttendanceService : IAttendanceService
 
         if (attendance.CheckOutTime != null)
         {
-            throw new InvalidOperationException($"Nhân viên ID={userId} đã thực hiện Check-Out ngày {date:dd/MM/yyyy} rồi.");
+            throw new InvalidOperationException($"Nhân viên ID={userId} đã thực hiện Check-Out ngày {targetDate:dd/MM/yyyy} rồi.");
         }
 
-        if (checkOutTime <= attendance.CheckInTime.Value)
+        if (targetCheckOutTime <= attendance.CheckInTime.Value)
         {
-            throw new InvalidOperationException($"Giờ Check-Out ({checkOutTime:HH:mm}) phải lớn hơn giờ Check-In ({attendance.CheckInTime.Value:HH:mm}).");
+            throw new InvalidOperationException($"Giờ Check-Out ({targetCheckOutTime:HH:mm}) phải lớn hơn giờ Check-In ({attendance.CheckInTime.Value:HH:mm}).");
         }
 
-        attendance.CheckOutTime = checkOutTime;
+        attendance.CheckOutTime = targetCheckOutTime;
         await _db.SaveChangesAsync();
     }
 
