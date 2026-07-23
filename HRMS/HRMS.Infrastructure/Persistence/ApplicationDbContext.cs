@@ -144,6 +144,9 @@ public partial class ApplicationDbContext : DbContext, IApplicationDbContext
                 .HasMaxLength(20)
                 .IsUnicode(false)
                 .HasDefaultValue("Active");
+            entity.Property(e => e.Reason)
+                .HasMaxLength(500)
+                .IsUnicode(true);
 
             entity.HasOne(d => d.User).WithMany(p => p.EmploymentContracts)
                 .HasForeignKey(d => d.UserId)

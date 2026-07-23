@@ -22,6 +22,7 @@ public class AccountService : IAccountService
         
         return await context.Accounts
             .Include(a => a.User)
+                .ThenInclude(u => u.Department)
             .Include(a => a.Roles)
             .OrderBy(a => a.Username)
             .Select(a => new AccountDto
@@ -33,6 +34,7 @@ public class AccountService : IAccountService
                 EmployeeCode = a.User.EmployeeCode,
                 FullName = a.User.FullName,
                 EmailCompany = a.User.EmailCompany,
+                DepartmentId = a.User.DepartmentId,
                 RoleIds = a.Roles.Select(r => r.Id).ToList(),
                 RoleNames = a.Roles.Select(r => r.Name).ToList()
             })
@@ -45,6 +47,7 @@ public class AccountService : IAccountService
         
         var account = await context.Accounts
             .Include(a => a.User)
+                .ThenInclude(u => u.Department)
             .Include(a => a.Roles)
             .FirstOrDefaultAsync(a => a.Id == accountId);
 
@@ -60,6 +63,7 @@ public class AccountService : IAccountService
             EmployeeCode = account.User.EmployeeCode,
             FullName = account.User.FullName,
             EmailCompany = account.User.EmailCompany,
+            DepartmentId = account.User.DepartmentId,
             RoleIds = account.Roles.Select(r => r.Id).ToList(),
             RoleNames = account.Roles.Select(r => r.Name).ToList()
         };
@@ -71,6 +75,7 @@ public class AccountService : IAccountService
         
         var account = await context.Accounts
             .Include(a => a.User)
+                .ThenInclude(u => u.Department)
             .Include(a => a.Roles)
             .FirstOrDefaultAsync(a => a.UserId == userId);
 
@@ -86,6 +91,7 @@ public class AccountService : IAccountService
             EmployeeCode = account.User.EmployeeCode,
             FullName = account.User.FullName,
             EmailCompany = account.User.EmailCompany,
+            DepartmentId = account.User.DepartmentId,
             RoleIds = account.Roles.Select(r => r.Id).ToList(),
             RoleNames = account.Roles.Select(r => r.Name).ToList()
         };
@@ -152,6 +158,7 @@ public class AccountService : IAccountService
             EmployeeCode = user.EmployeeCode,
             FullName = user.FullName,
             EmailCompany = user.EmailCompany,
+            DepartmentId = user.DepartmentId,
             RoleIds = account.Roles.Select(r => r.Id).ToList(),
             RoleNames = account.Roles.Select(r => r.Name).ToList()
         };

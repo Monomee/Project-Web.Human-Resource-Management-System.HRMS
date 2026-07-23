@@ -107,7 +107,8 @@ namespace HRMS.Infrastructure.Services
                         BaseSalary = c.BaseSalary,
                         StartDate = c.StartDate,
                         EndDate = c.EndDate,
-                        Status = c.Status
+                        Status = c.Status,
+                        Reason = c.Reason
                     })
                     .ToList()
             };

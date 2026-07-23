@@ -21,5 +21,7 @@ public partial class EmploymentContract
 
     public int UserId { get; set; }
 
+    public string? Reason { get; set; }
+
     public virtual User User { get; set; } = null!;
 }
