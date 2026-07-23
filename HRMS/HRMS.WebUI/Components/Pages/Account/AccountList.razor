@@ -5,6 +5,7 @@
 @inject IRoleService RoleService
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthProvider
+@using HRMS.Application.Helpers
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,Executive,HRM,HR,Manager")]
 
 <PageTitle>Quản lý Tài khoản</PageTitle>
@@ -76,7 +77,7 @@
                 </div>
 
                 <div class="mb-3">
-                    @if (isAdmin)
+                    @if (currentUserAccount != null && AuthorizationHelper.CanCreateAccount(currentUserAccount))
                     {
                         <button class="btn btn-primary" @onclick="ShowCreateModal">
                             <i class="bi bi-plus-circle me-2"></i>Thêm tài khoản mới
@@ -84,7 +85,7 @@
                     }
                     <span class="ms-3" style="color: #94a3b8; font-size: 0.9rem;">
                         Tổng số: <strong style="color: #60a5fa;">@filteredAccounts.Count()</strong> tài khoản
-                        @if (!isAdmin)
+                        @if (currentUserAccount == null || !AuthorizationHelper.CanCreateAccount(currentUserAccount))
                         {
                             <span class="badge" style="background: rgba(100, 116, 139, 0.5); color: #cbd5e1; margin-left: 0.5rem;">
                                 <i class="bi bi-eye me-1"></i>Chế độ xem
@@ -131,19 +132,28 @@
                                         }
                                     </td>
                                     <td class="text-center">
-                                        @if (isAdmin)
+                                        @if (currentUserAccount != null && AuthorizationHelper.CanEditAccount(currentUserAccount, acc))
                                         {
                                             <button class="btn btn-sm btn-info me-1" @onclick="() => ShowEditModal(acc.Id)" title="Sửa">
                                                 <i class="bi bi-pencil-fill"></i>
                                             </button>
+                                        }
+                                        @if (currentUserAccount != null && AuthorizationHelper.CanResetPassword(currentUserAccount))
+                                        {
                                             <button class="btn btn-sm btn-warning me-1" @onclick="() => ShowResetPasswordConfirmation(acc.Id)" title="Reset mật khẩu">
                                                 <i class="bi bi-arrow-clockwise"></i>
                                             </button>
+                                        }
+                                        @if (currentUserAccount != null && AuthorizationHelper.CanDeleteAccount(currentUserAccount))
+                                        {
                                             <button class="btn btn-sm btn-danger" @onclick="() => ShowDeleteConfirmation(acc.Id)" title="Xóa">
                                                 <i class="bi bi-trash-fill"></i>
                                             </button>
                                         }
-                                        else
+                                        @if (currentUserAccount == null || 
+                                            (!AuthorizationHelper.CanEditAccount(currentUserAccount, acc) && 
+                                             !AuthorizationHelper.CanResetPassword(currentUserAccount) && 
+                                             !AuthorizationHelper.CanDeleteAccount(currentUserAccount)))
                                         {
                                             <span class="text-muted" style="font-size: 0.85rem;">
                                                 <i class="bi bi-eye-slash me-1"></i>Chỉ xem
@@ -226,6 +236,7 @@
 
 @code {
     private List<AccountDto>? accounts;
+    private List<AccountDto>? allAccounts; // Store all accounts before filtering
     private List<EmployeeDto> employeeList = new();
     private List<RoleDto> roleList = new();
     private List<RoleDto> roles = new();
@@ -248,6 +259,7 @@
     private int currentAccountId = 0;
     private string currentUserRole = string.Empty;
     private bool isAdmin = false;
+    private AccountDto? currentUserAccount = null;
 
     // Filter variables
     private string searchKeyword = string.Empty;
@@ -300,8 +312,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadData();
         await LoadCurrentUser();
+        await LoadData();
     }
     
     private async Task LoadCurrentUser()
@@ -318,6 +330,8 @@
                 if (accountIdClaim != null && int.TryParse(accountIdClaim.Value, out int accId))
                 {
                     currentAccountId = accId;
+                    // Load current user's account details
+                    currentUserAccount = await AccountService.GetByIdAsync(accId);
                 }
                 
                 // Get Role
@@ -334,6 +348,7 @@
             currentAccountId = 0;
             currentUserRole = string.Empty;
             isAdmin = false;
+            currentUserAccount = null;
         }
     }
 
@@ -341,7 +356,18 @@
     {
         try
         {
-            accounts = await AccountService.GetAllAsync();
+            allAccounts = await AccountService.GetAllAsync();
+            
+            // Filter accounts based on user permission
+            if (currentUserAccount != null)
+            {
+                accounts = AuthorizationHelper.FilterAccountsByPermission(currentUserAccount, allAccounts);
+            }
+            else
+            {
+                accounts = allAccounts;
+            }
+            
             employeeList = await EmployeeService.GetEmployeesWithDetailsAsync();
             roleList = await RoleService.GetAllAsync();
             roles = roleList; // Populate roles for dropdown

@@ -114,6 +114,24 @@
                             </div>
                         </div>
 
+                        <!-- Lý do từ chối (if Rejected) - Full width row -->
+                        @if (ContractData != null && !string.IsNullOrWhiteSpace(ContractData.Reason))
+                        {
+                            <div class="row mt-2">
+                                <div class="col-12">
+                                    <div class="alert-reason-display">
+                                        <div class="reason-header">
+                                            <i class="bi bi-exclamation-circle-fill me-2"></i>
+                                            <strong>Lý do từ chối/chấm dứt:</strong>
+                                        </div>
+                                        <div class="reason-content">
+                                            @ContractData.Reason
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
                         @if (!string.IsNullOrEmpty(errorMessage))
                         {
                             <div class="alert alert-danger-dark mt-3">
@@ -448,6 +466,33 @@
         padding: 0.85rem 1rem;
         color: #fca5a5;
         font-size: 0.9rem;
+    }
+
+    /* Reason Display Box */
+    .alert-reason-display {
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        border-left: 4px solid #ef4444;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .reason-header {
+        display: flex;
+        align-items: center;
+        color: #fca5a5;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .reason-content {
+        color: #f0abab;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        padding-left: 1.75rem;
+        font-style: italic;
     }
 
     .validation-message {

@@ -14,6 +14,7 @@ public class AccountDto
     public string EmployeeCode { get; set; } = null!;
     public string FullName { get; set; } = null!;
     public string EmailCompany { get; set; } = null!;
+    public int DepartmentId { get; set; }
     
     // Role information
     public List<int> RoleIds { get; set; } = new();

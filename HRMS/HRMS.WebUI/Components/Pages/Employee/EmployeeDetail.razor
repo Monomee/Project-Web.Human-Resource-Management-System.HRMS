@@ -158,8 +158,8 @@
                     <span>Lịch sử Hợp đồng Lao động</span>
                     <span class="badge-contract-count ms-2">@employee.Contracts.Count hợp đồng</span>
                 </div>
-                <!-- Only Admin can create contract -->
-                @if (isAdmin)
+                <!-- Only HR and HRM can create contract -->
+                @if (isHrOrHrm)
                 {
                     <button class="btn-add-contract" @onclick="OpenCreateContractModal">
                         <i class="bi bi-plus-circle me-2"></i>Thêm hợp đồng mới
@@ -191,6 +191,7 @@
                                     <th>Ngày kết thúc</th>
                                     <th class="text-end">Lương cơ bản</th>
                                     <th class="text-center">Trạng thái</th>
+                                    <th style="min-width: 180px;">Lý do</th>
                                     <th class="text-center">Thao tác</th>
                                 </tr>
                             </thead>
@@ -238,22 +239,38 @@
                                                 @contract.StatusDisplayName
                                             </span>
                                         </td>
+                                        <td>
+                                            @if (!string.IsNullOrWhiteSpace(contract.Reason))
+                                            {
+                                                <span class="reason-badge" title="@contract.Reason">
+                                                    <i class="bi bi-chat-left-text me-1"></i>
+                                                    @(contract.Reason.Length > 50 ? contract.Reason.Substring(0, 50) + "..." : contract.Reason)
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">—</span>
+                                            }
+                                        </td>
                                         <td class="text-center">
                                             @if (contract.Status == "Pending")
                                             {
-                                                <!-- Pending: Only Admin can Edit, Approve, Reject -->
-                                                @if (isAdmin)
+                                                <!-- Pending: HR/HRM can Edit, only HRM can Approve/Reject -->
+                                                @if (isHrOrHrm)
                                                 {
                                                     <div class="btn-action-group">
                                                         <button class="btn-edit-contract" @onclick="() => OpenEditContractModal(contract)" title="Chỉnh sửa hợp đồng">
                                                             <i class="bi bi-pencil-fill"></i>
                                                         </button>
-                                                        <button class="btn-approve-contract" @onclick="() => OpenApproveModal(contract)" title="Phê duyệt">
-                                                            <i class="bi bi-check-circle-fill"></i>
-                                                        </button>
-                                                        <button class="btn-reject-contract" @onclick="() => OpenRejectModal(contract)" title="Từ chối">
-                                                            <i class="bi bi-x-circle-fill"></i>
-                                                        </button>
+                                                        @if (isHrm)
+                                                        {
+                                                            <button class="btn-approve-contract" @onclick="() => OpenApproveModal(contract)" title="Phê duyệt">
+                                                                <i class="bi bi-check-circle-fill"></i>
+                                                            </button>
+                                                            <button class="btn-reject-contract" @onclick="() => OpenRejectModal(contract)" title="Từ chối">
+                                                                <i class="bi bi-x-circle-fill"></i>
+                                                            </button>
+                                                        }
                                                     </div>
                                                 }
                                                 else
@@ -263,8 +280,8 @@
                                             }
                                             else if (contract.Status == "Rejected")
                                             {
-                                                <!-- Rejected: Only Admin can Edit -->
-                                                @if (isAdmin)
+                                                <!-- Rejected: HR/HRM can Edit to resubmit -->
+                                                @if (isHrOrHrm)
                                                 {
                                                     <button class="btn-edit-contract" @onclick="() => OpenEditContractModal(contract)" title="Chỉnh sửa hợp đồng">
                                                         <i class="bi bi-pencil-fill"></i>
@@ -277,15 +294,15 @@
                                             }
                                             else if (contract.Status == "Active")
                                             {
-                                                <!-- Active: Only Admin can Deactivate and Terminate -->
-                                                @if (isAdmin)
+                                                <!-- Active: HRM can Terminate/Deactivate -->
+                                                @if (isHrm)
                                                 {
                                                     <div class="btn-action-group">
-                                                        <button class="btn-deactivate-contract" @onclick="() => OpenDeactivateModal(contract)" title="Vô hiệu hóa hợp đồng">
-                                                            <i class="bi bi-pause-circle-fill"></i>
-                                                        </button>
                                                         <button class="btn-terminate-contract" @onclick="() => OpenTerminateModal(contract)" title="Chấm dứt hợp đồng">
                                                             <i class="bi bi-stop-circle-fill"></i>
+                                                        </button>
+                                                        <button class="btn-deactivate-contract" @onclick="() => OpenDeactivateModal(contract)" title="Vô hiệu hóa">
+                                                            <i class="bi bi-pause-circle-fill"></i>
                                                         </button>
                                                     </div>
                                                 }
@@ -575,7 +592,8 @@
 
     // Current user role tracking
     private string currentUserRole = string.Empty;
-    private bool isAdmin = false;
+    private bool isHrOrHrm = false; // HR or HRM
+    private bool isHrm = false;     // HRM only
 
     protected override async Task OnInitializedAsync()
     {
@@ -597,14 +615,16 @@
                 if (roleClaim != null)
                 {
                     currentUserRole = roleClaim.Value;
-                    isAdmin = (currentUserRole == "Admin");
+                    isHrm = (currentUserRole == "HRM");
+                    isHrOrHrm = (currentUserRole == "HR" || currentUserRole == "HRM");
                 }
             }
         }
         catch
         {
             currentUserRole = string.Empty;
-            isAdmin = false;
+            isHrOrHrm = false;
+            isHrm = false;
         }
     }
 
@@ -1636,5 +1656,28 @@
     .text-info-small {
         color: #93c5fd;
         font-size: 0.85rem;
+    }
+
+    /* Reason Badge */
+    .reason-badge {
+        display: inline-block;
+        padding: 0.35rem 0.65rem;
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(51, 65, 85, 0.6);
+        border-radius: 6px;
+        color: #94a3b8;
+        font-size: 0.8rem;
+        max-width: 200px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: help;
+        transition: all 0.2s ease;
+    }
+
+    .reason-badge:hover {
+        background: rgba(30, 41, 59, 0.9);
+        border-color: rgba(71, 85, 105, 0.8);
+        color: #cbd5e1;
     }
 </style>

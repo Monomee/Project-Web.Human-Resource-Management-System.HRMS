@@ -40,7 +40,8 @@ public class ContractService : IContractService
                 BaseSalary = c.BaseSalary,
                 StartDate = c.StartDate,
                 EndDate = c.EndDate,
-                Status = c.Status
+                Status = c.Status,
+                Reason = c.Reason
             })
             .ToListAsync();
 
@@ -115,7 +116,8 @@ public class ContractService : IContractService
             BaseSalary = contract.BaseSalary,
             StartDate = contract.StartDate,
             EndDate = contract.EndDate,
-            Status = contract.Status
+            Status = contract.Status,
+            Reason = contract.Reason
         };
     }
 
@@ -233,6 +235,7 @@ public class ContractService : IContractService
         }
 
         contract.Status = "Rejected";
+        contract.Reason = reason; // Save rejection reason
         await _context.SaveChangesAsync();
 
         return true;
@@ -255,9 +258,10 @@ public class ContractService : IContractService
             throw new BusinessException("Chỉ có thể chấm dứt hợp đồng đang ở trạng thái 'Hiệu lực'.");
         }
 
-        // Terminate contract by setting EndDate to today (or you can use a "Terminated" status if needed)
+        // Terminate contract by setting EndDate to today
         contract.EndDate = DateOnly.FromDateTime(DateTime.Today);
-        // Or optionally: contract.Status = "Terminated";
+        contract.Status = "Terminated";
+        contract.Reason = reason; // Save termination reason
 
         await _context.SaveChangesAsync();
 
@@ -283,6 +287,7 @@ public class ContractService : IContractService
 
         // Deactivate by changing status to Terminated
         contract.Status = "Terminated";
+        contract.Reason = reason; // Save deactivation reason
 
         await _context.SaveChangesAsync();
 

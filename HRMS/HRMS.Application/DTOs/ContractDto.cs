@@ -12,6 +12,7 @@ namespace HRMS.Application.DTOs
         public DateOnly StartDate { get; set; }
         public DateOnly? EndDate { get; set; }
         public string Status { get; set; } = null!;
+        public string? Reason { get; set; }
         
         /// <summary>
         /// Parsed status as enum
