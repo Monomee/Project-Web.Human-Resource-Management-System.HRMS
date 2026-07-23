@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using HRMS.Application.DTOs.TimePeriod;
+using HRMS.Application.DTOs.Attendance;
 using HRMS.Application.Interfaces;
 using HRMS.Domain.Entities;
 using HRMS.Infrastructure.Persistence;

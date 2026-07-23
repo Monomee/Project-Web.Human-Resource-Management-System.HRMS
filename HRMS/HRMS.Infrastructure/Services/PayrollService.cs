@@ -44,17 +44,17 @@ public class PayrollService : IPayrollService
             .Where(c => c.Status == "Active")
             .ToDictionaryAsync(c => c.UserId);
 
-        // Lấy nhật ký chấm công trong kỳ
-        var attendanceLogs = await _db.AttendanceLogs
-            .Where(log => log.PeriodId == periodId)
+        // Lấy dữ liệu điểm danh trong kỳ
+        var attendances = await _db.Attendances
+            .Where(a => a.PeriodId == periodId && a.CheckInTime != null)
             .ToListAsync();
 
-        // Gom nhóm đếm số ngày công thực tế (D_actual) của mỗi nhân viên (distinct ngày)
-        var attendanceDaysDict = attendanceLogs
-            .GroupBy(log => log.UserId)
+        // Gom nhóm đếm số ngày công thực tế (D_actual) của mỗi nhân viên
+        var attendanceDaysDict = attendances
+            .GroupBy(a => a.EmployeeId)
             .ToDictionary(
                 g => g.Key,
-                g => g.Select(log => log.CheckedAt.Date).Distinct().Count()
+                g => g.Select(a => a.AttendanceDate).Distinct().Count()
             );
 
         // Lấy đơn từ được phê duyệt trong khoảng thời gian kỳ công
@@ -248,15 +248,15 @@ public class PayrollService : IPayrollService
             var periodStart = period.StartDate.ToDateTime(TimeOnly.MinValue);
             var periodEnd = period.EndDate.ToDateTime(TimeOnly.MaxValue);
 
-            // Pre-load all attendance logs for this period to populate in-memory (performance optimization)
-            var attendanceLogs = await _db.AttendanceLogs
-                .Where(log => log.PeriodId == periodId)
+            // Pre-load all attendances for this period to populate in-memory (performance optimization)
+            var attendances = await _db.Attendances
+                .Where(a => a.PeriodId == periodId && a.CheckInTime != null)
                 .ToListAsync();
-            var attendanceDaysDict = attendanceLogs
-                .GroupBy(log => log.UserId)
+            var attendanceDaysDict = attendances
+                .GroupBy(a => a.EmployeeId)
                 .ToDictionary(
                     g => g.Key,
-                    g => g.Select(log => log.CheckedAt.Date).Distinct().Count()
+                    g => g.Select(a => a.AttendanceDate).Distinct().Count()
                 );
 
             // Pre-load all approved requests for this period
@@ -309,9 +309,9 @@ public class PayrollService : IPayrollService
             var periodEnd = period.EndDate.ToDateTime(TimeOnly.MaxValue);
 
             // Calculate actual days
-            payslip.ActualDays = await _db.AttendanceLogs
-                .Where(log => log.UserId == userId && log.PeriodId == periodId)
-                .Select(log => log.CheckedAt.Date)
+            payslip.ActualDays = await _db.Attendances
+                .Where(a => a.EmployeeId == userId && a.PeriodId == periodId && a.CheckInTime != null)
+                .Select(a => a.AttendanceDate)
                 .Distinct()
                 .CountAsync();
 

@@ -1,0 +1,492 @@
+@page "/attendance/shifts"
+@rendermode InteractiveServer
+
+@using HRMS.Application.Interfaces
+@using HRMS.Application.DTOs.Attendance
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+
+@attribute [Authorize(Roles = "Admin,HRM,HR")]
+@inject IAttendanceService AttendanceService
+@inject IApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Quản lý Ca & Phân ca — HRMS</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="h3 fw-bold text-primary mb-1">
+                <i class="bi bi-sliders me-2"></i>Quản lý Ca & Phân ca làm việc
+            </h2>
+            <p class="text-muted mb-0">Cấu hình danh mục Ca làm việc và phân ca tạm thời cho nhân viên.</p>
+        </div>
+        <div>
+            <button class="btn btn-primary me-2 shadow-sm" @onclick="OpenCreateShiftModal">
+                <i class="bi bi-plus-circle me-1"></i>Thêm Ca làm việc
+            </button>
+            <button class="btn btn-outline-primary shadow-sm" @onclick="OpenAssignShiftModal">
+                <i class="bi bi-person-plus me-1"></i>Phân ca cho Nhân viên
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@_errorMessage
+            <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm mb-4" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>@_successMessage
+            <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+        </div>
+    }
+
+    <!-- TAB NAVIGATION -->
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <button class="nav-link @(_activeTab == "shifts" ? "active fw-bold" : "")" @onclick='() => _activeTab = "shifts"'>
+                <i class="bi bi-clock me-1"></i>Danh sách Ca làm việc (@_shifts.Count)
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(_activeTab == "assignments" ? "active fw-bold" : "")" @onclick='() => _activeTab = "assignments"'>
+                <i class="bi bi-person-lines-fill me-1"></i>Phân ca tạm thời (@_assignments.Count)
+            </button>
+        </li>
+    </ul>
+
+    @if (_isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="text-muted mt-2">Đang tải dữ liệu ca làm việc...</p>
+        </div>
+    }
+    else
+    {
+        <!-- TAB 1: DANH SÁCH CA LÀM VIỆC -->
+        @if (_activeTab == "shifts")
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Tên Ca</th>
+                                    <th>Giờ Vào - Ra</th>
+                                    <th>Nghỉ trưa</th>
+                                    <th class="text-center">Dung sai vào</th>
+                                    <th class="text-center">Dung sai ra</th>
+                                    <th class="text-center">Trạng thái</th>
+                                    <th class="text-end pe-4">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var shift in _shifts)
+                                {
+                                    <tr>
+                                        <td>#@shift.Id</td>
+                                        <td class="fw-bold text-dark">@shift.Name</td>
+                                        <td>
+                                            <span class="badge bg-primary fs-6">@shift.StartTime.ToString("HH:mm") - @shift.EndTime.ToString("HH:mm")</span>
+                                        </td>
+                                        <td>@shift.BreakStart.ToString("HH:mm") - @shift.BreakEnd.ToString("HH:mm")</td>
+                                        <td class="text-center">+@shift.LateToleranceMinute phút</td>
+                                        <td class="text-center">+@shift.LateCheckOutMinute phút</td>
+                                        <td class="text-center">
+                                            @if (shift.IsActive)
+                                            {
+                                                <span class="badge bg-success">Đang dùng</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Ngừng dùng</span>
+                                            }
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OpenEditShiftModal(shift)">
+                                                <i class="bi bi-pencil"></i> Sửa
+                                            </button>
+                                            @if (shift.IsActive)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeactivateShift(shift.Id)">
+                                                    <i class="bi bi-slash-circle"></i> Vô hiệu
+                                                </button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- TAB 2: PHÂN CA TẠM THỜI -->
+        @if (_activeTab == "assignments")
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Mã NV</th>
+                                    <th>Họ và Tên</th>
+                                    <th>Ca được phân</th>
+                                    <th>Từ ngày</th>
+                                    <th>Đến ngày</th>
+                                    <th>Ngày tạo</th>
+                                    <th class="text-end pe-4">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!_assignments.Any())
+                                {
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">
+                                            Chưa có phân ca tạm thời nào. Hệ thống đang tự động dùng Ca mặc định theo Chức vụ.
+                                        </td>
+                                    </tr>
+                                }
+                                @foreach (var ass in _assignments)
+                                {
+                                    <tr>
+                                        <td class="fw-bold">@ass.EmployeeCode</td>
+                                        <td>@ass.EmployeeName</td>
+                                        <td><span class="badge bg-info text-dark">@ass.ShiftName</span></td>
+                                        <td>@ass.StartDate.ToString("dd/MM/yyyy")</td>
+                                        <td>@ass.EndDate.ToString("dd/MM/yyyy")</td>
+                                        <td class="small text-muted">@ass.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td class="text-end pe-4">
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAssignment(ass.Id)">
+                                                <i class="bi bi-trash"></i> Xóa
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<!-- MODAL TẠO/SỬA CA LÀM VIỆC -->
+@if (_showShiftModal)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-clock me-2"></i>@(_editingShift.Id == 0 ? "Thêm Ca làm việc mới" : "Cập nhật Ca làm việc")
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => _showShiftModal = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tên Ca làm việc</label>
+                        <input type="text" class="form-control" @bind="_editingShift.Name" placeholder="Ví dụ: Ca Hành Chính 08:00 - 17:30" />
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Giờ Bắt đầu</label>
+                            <input type="time" class="form-control" value="@_editingShift.StartTime.ToString("HH:mm")"
+                                   @onchange='e => SetTimeOnly(t => _editingShift.StartTime = t, e.Value?.ToString())' />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Giờ Kết thúc</label>
+                            <input type="time" class="form-control" value="@_editingShift.EndTime.ToString("HH:mm")"
+                                   @onchange='e => SetTimeOnly(t => _editingShift.EndTime = t, e.Value?.ToString())' />
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Nghỉ trưa Bắt đầu</label>
+                            <input type="time" class="form-control" value="@_editingShift.BreakStart.ToString("HH:mm")"
+                                   @onchange='e => SetTimeOnly(t => _editingShift.BreakStart = t, e.Value?.ToString())' />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Nghỉ trưa Kết thúc</label>
+                            <input type="time" class="form-control" value="@_editingShift.BreakEnd.ToString("HH:mm")"
+                                   @onchange='e => SetTimeOnly(t => _editingShift.BreakEnd = t, e.Value?.ToString())' />
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Dung sai Trễ (phút)</label>
+                            <input type="number" class="form-control" @bind="_editingShift.LateToleranceMinute" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Dung sai OT (phút)</label>
+                            <input type="number" class="form-control" @bind="_editingShift.LateCheckOutMinute" />
+                        </div>
+                    </div>
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" id="shiftActive" @bind="_editingShift.IsActive">
+                        <label class="form-check-label fw-bold" for="shiftActive">Kích hoạt ca làm việc này</label>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => _showShiftModal = false">Hủy</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveShiftAsync">Lưu Ca làm việc</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL PHÂN CA CHO NHÂN VIÊN -->
+@if (_showAssignModal)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-person-plus me-2"></i>Phân ca tạm thời cho Nhân viên
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => _showAssignModal = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Chọn Nhân viên</label>
+                        <select class="form-select" @bind="_newAssign.EmployeeId">
+                            <option value="0">-- Chọn nhân viên --</option>
+                            @foreach (var emp in _employees)
+                            {
+                                <option value="@emp.Id">@emp.EmployeeCode - @emp.FullName (@emp.DepartmentName)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Chọn Ca làm việc</label>
+                        <select class="form-select" @bind="_newAssign.ShiftId">
+                            <option value="0">-- Chọn Ca --</option>
+                            @foreach (var s in _shifts.Where(x => x.IsActive))
+                            {
+                                <option value="@s.Id">@s.Name (@s.StartTime.ToString("HH:mm") - @s.EndTime.ToString("HH:mm"))</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Từ ngày</label>
+                            <input type="date" class="form-control" value="@_newAssign.StartDate.ToString("yyyy-MM-dd")"
+                                   @onchange='e => SetDateOnly(d => _newAssign.StartDate = d, e.Value?.ToString())' />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Đến ngày</label>
+                            <input type="date" class="form-control" value="@_newAssign.EndDate.ToString("yyyy-MM-dd")"
+                                   @onchange='e => SetDateOnly(d => _newAssign.EndDate = d, e.Value?.ToString())' />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => _showAssignModal = false">Hủy</button>
+                    <button type="button" class="btn btn-success" @onclick="SaveAssignmentAsync">Phân Ca</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string _activeTab = "shifts";
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    private List<ShiftDto> _shifts = new();
+    private List<ShiftAssignmentDto> _assignments = new();
+    private List<(int Id, string EmployeeCode, string FullName, string DepartmentName)> _employees = new();
+
+    private bool _showShiftModal = false;
+    private UpdateShiftDto _editingShift = new();
+
+    private bool _showAssignModal = false;
+    private CreateShiftAssignmentDto _newAssign = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllDataAsync();
+    }
+
+    private async Task LoadAllDataAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        try
+        {
+            _shifts = await AttendanceService.GetShiftsAsync();
+            _assignments = await AttendanceService.GetShiftAssignmentsAsync();
+
+            _employees = DbContext.Users
+                .Select(u => new { u.Id, u.EmployeeCode, u.FullName, DeptName = u.Department.Name })
+                .ToList()
+                .Select(x => (x.Id, x.EmployeeCode, x.FullName, x.DeptName))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Lỗi tải dữ liệu ca làm việc: " + ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OpenCreateShiftModal()
+    {
+        _editingShift = new UpdateShiftDto
+        {
+            Id = 0,
+            Name = "",
+            StartTime = new TimeOnly(8, 0),
+            EndTime = new TimeOnly(17, 30),
+            BreakStart = new TimeOnly(12, 0),
+            BreakEnd = new TimeOnly(13, 30),
+            LateToleranceMinute = 15,
+            EarlyCheckInMinute = 30,
+            LateCheckOutMinute = 30,
+            IsActive = true
+        };
+        _showShiftModal = true;
+    }
+
+    private void OpenEditShiftModal(ShiftDto shift)
+    {
+        _editingShift = new UpdateShiftDto
+        {
+            Id = shift.Id,
+            Name = shift.Name,
+            StartTime = shift.StartTime,
+            EndTime = shift.EndTime,
+            BreakStart = shift.BreakStart,
+            BreakEnd = shift.BreakEnd,
+            LateToleranceMinute = shift.LateToleranceMinute,
+            EarlyCheckInMinute = shift.EarlyCheckInMinute,
+            LateCheckOutMinute = shift.LateCheckOutMinute,
+            IsActive = shift.IsActive
+        };
+        _showShiftModal = true;
+    }
+
+    private async Task SaveShiftAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_editingShift.Name))
+        {
+            _errorMessage = "Tên ca không được để trống.";
+            return;
+        }
+
+        try
+        {
+            if (_editingShift.Id == 0)
+            {
+                await AttendanceService.CreateShiftAsync(_editingShift);
+                _successMessage = "Tạo ca làm việc thành công!";
+            }
+            else
+            {
+                await AttendanceService.UpdateShiftAsync(_editingShift);
+                _successMessage = "Cập nhật ca làm việc thành công!";
+            }
+            _showShiftModal = false;
+            await LoadAllDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private async Task DeactivateShift(int id)
+    {
+        try
+        {
+            await AttendanceService.DeleteShiftAsync(id);
+            _successMessage = "Đã ngừng sử dụng Ca làm việc!";
+            await LoadAllDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private void OpenAssignShiftModal()
+    {
+        _newAssign = new CreateShiftAssignmentDto
+        {
+            EmployeeId = 0,
+            ShiftId = _shifts.FirstOrDefault(s => s.IsActive)?.Id ?? 0,
+            StartDate = DateOnly.FromDateTime(DateTime.Now),
+            EndDate = DateOnly.FromDateTime(DateTime.Now.AddDays(30))
+        };
+        _showAssignModal = true;
+    }
+
+    private async Task SaveAssignmentAsync()
+    {
+        if (_newAssign.EmployeeId <= 0 || _newAssign.ShiftId <= 0)
+        {
+            _errorMessage = "Vui lòng chọn Nhân viên và Ca làm việc.";
+            return;
+        }
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var nameId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            int.TryParse(nameId, out int accId);
+
+            await AttendanceService.AssignShiftAsync(_newAssign, accId);
+            _successMessage = "Phân ca làm việc tạm thời thành công!";
+            _showAssignModal = false;
+            await LoadAllDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private async Task DeleteAssignment(int id)
+    {
+        try
+        {
+            await AttendanceService.DeleteShiftAssignmentAsync(id);
+            _successMessage = "Đã xóa phân ca tạm thời!";
+            await LoadAllDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private void SetTimeOnly(Action<TimeOnly> setter, string? val)
+    {
+        if (TimeOnly.TryParse(val, out var time)) setter(time);
+    }
+
+    private void SetDateOnly(Action<DateOnly> setter, string? val)
+    {
+        if (DateOnly.TryParse(val, out var date)) setter(date);
+    }
+}

@@ -41,7 +41,7 @@ public class AttendanceImportResultDto
 
     /// <summary>
     /// Cờ đánh dấu dòng này có lỗi không (ví dụ: mã nhân viên không tồn tại trong DB).
-    /// Nếu HasError = true, dòng này sẽ KHÔNG được lưu vào AttendanceLogs.
+    /// Nếu HasError = true, dòng này sẽ KHÔNG được lưu.
     /// </summary>
     public bool HasError { get; set; }
 }

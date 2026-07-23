@@ -44,16 +44,6 @@
                     </NavLink>
                 </div>
 
-                <!-- Chấm công: Import Excel -->
-                <div class="nav-item-vertical">
-                    <NavLink class="nav-link-vertical" href="attendance/import">
-                        <div class="icon-frame">
-                            <i class="bi bi-calendar2-check-fill icon-vertical"></i>
-                        </div>
-                        <span class="text-vertical">Import Chấm công</span>
-                    </NavLink>
-                </div>
-
                 <!-- Quản lý Kỳ công (Create/Read/Update TimesheetPeriod) -->
                 <div class="nav-item-vertical">
                     <NavLink class="nav-link-vertical" href="attendance/periods">
@@ -64,13 +54,23 @@
                     </NavLink>
                 </div>
 
-                <!-- Danh sách chấm công (xem + sửa AttendanceLogs theo kỳ) -->
+                <!-- Danh sách chấm công -->
                 <div class="nav-item-vertical">
-                    <NavLink class="nav-link-vertical" href="attendance/logs">
+                    <NavLink class="nav-link-vertical" href="attendance/list">
                         <div class="icon-frame">
                             <i class="bi bi-clock-history icon-vertical"></i>
                         </div>
                         <span class="text-vertical">Danh sách Chấm công</span>
+                    </NavLink>
+                </div>
+
+                <!-- Quản lý Ca làm việc -->
+                <div class="nav-item-vertical">
+                    <NavLink class="nav-link-vertical" href="attendance/shifts">
+                        <div class="icon-frame">
+                            <i class="bi bi-sliders icon-vertical"></i>
+                        </div>
+                        <span class="text-vertical">Quản lý Ca làm việc</span>
                     </NavLink>
                 </div>
 
@@ -105,6 +105,16 @@
         <!-- GROUP 3: PERSONAL PAGE (TRANG CÁ NHÂN) - Mọi nhân sự -->
         <div class="menu-section-header text-uppercase text-muted fw-bold">
             Trang cá nhân
+        </div>
+
+        <!-- Điểm danh cá nhân -->
+        <div class="nav-item-vertical">
+            <NavLink class="nav-link-vertical" href="attendance/my-attendance">
+                <div class="icon-frame">
+                    <i class="bi bi-clock-fill icon-vertical"></i>
+                </div>
+                <span class="text-vertical">Điểm danh cá nhân</span>
+            </NavLink>
         </div>
 
         <!-- Gửi đơn từ -->

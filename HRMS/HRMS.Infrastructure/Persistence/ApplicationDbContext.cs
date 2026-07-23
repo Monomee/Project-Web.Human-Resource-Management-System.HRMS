@@ -19,8 +19,6 @@ public partial class ApplicationDbContext : DbContext, IApplicationDbContext
 
     public virtual DbSet<Account> Accounts { get; set; }
 
-    public virtual DbSet<AttendanceLog> AttendanceLogs { get; set; }
-
     public virtual DbSet<Department> Departments { get; set; }
 
     public virtual DbSet<EmploymentContract> EmploymentContracts { get; set; }
@@ -40,6 +38,10 @@ public partial class ApplicationDbContext : DbContext, IApplicationDbContext
     public virtual DbSet<TimesheetPeriod> TimesheetPeriods { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<Shift> Shifts { get; set; }
+    public virtual DbSet<ShiftAssignment> ShiftAssignments { get; set; }
+    public virtual DbSet<Attendance> Attendances { get; set; }
 
     public DbSet<EmployeeRequest> EmployeeRequests => Set<EmployeeRequest>();
     public DbSet<OvertimeRecord> OvertimeRecords => Set<OvertimeRecord>();
@@ -83,32 +85,6 @@ public partial class ApplicationDbContext : DbContext, IApplicationDbContext
                         j.HasKey("AccountId", "RoleId");
                         j.ToTable("AccountRoles");
                     });
-        });
-
-        modelBuilder.Entity<AttendanceLog>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Attendan__3214EC07BDED11DB");
-
-            entity.HasIndex(e => new { e.UserId, e.PeriodId }, "IX_AttendanceLogs_UserPeriod");
-
-            entity.Property(e => e.CheckType)
-                .HasMaxLength(10)
-                .IsUnicode(false);
-            entity.Property(e => e.CheckedAt).HasColumnType("datetime");
-            entity.Property(e => e.Source)
-                .HasMaxLength(20)
-                .IsUnicode(false)
-                .HasDefaultValue("Excel");
-
-            entity.HasOne(d => d.Period).WithMany(p => p.AttendanceLogs)
-                .HasForeignKey(d => d.PeriodId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_AttendanceLogs_Periods");
-
-            entity.HasOne(d => d.User).WithMany(p => p.AttendanceLogs)
-                .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_AttendanceLogs_Users");
         });
 
         modelBuilder.Entity<Department>(entity =>
@@ -202,6 +178,63 @@ public partial class ApplicationDbContext : DbContext, IApplicationDbContext
                 .HasMaxLength(20)
                 .IsUnicode(false);
             entity.Property(e => e.Name).HasMaxLength(100);
+
+            entity.HasOne(d => d.DefaultShift).WithMany(p => p.Positions)
+                .HasForeignKey(d => d.DefaultShiftId)
+                .HasConstraintName("FK_Positions_Shifts");
+        });
+
+        modelBuilder.Entity<Shift>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.ToTable("Shifts");
+            entity.Property(e => e.Name).HasMaxLength(100);
+            entity.Property(e => e.StartTime).HasColumnType("time");
+            entity.Property(e => e.EndTime).HasColumnType("time");
+            entity.Property(e => e.BreakStart).HasColumnType("time");
+            entity.Property(e => e.BreakEnd).HasColumnType("time");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<ShiftAssignment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.ToTable("ShiftAssignments");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+
+            entity.HasOne(d => d.Employee).WithMany(p => p.ShiftAssignments)
+                .HasForeignKey(d => d.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ShiftAssignments_Users");
+
+            entity.HasOne(d => d.Shift).WithMany(p => p.ShiftAssignments)
+                .HasForeignKey(d => d.ShiftId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ShiftAssignments_Shifts");
+
+            entity.HasOne(d => d.AssignedByAccount).WithMany()
+                .HasForeignKey(d => d.AssignedBy)
+                .HasConstraintName("FK_ShiftAssignments_Accounts");
+        });
+
+        modelBuilder.Entity<Attendance>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.ToTable("Attendance");
+            entity.HasIndex(e => new { e.EmployeeId, e.AttendanceDate }, "UQ_Attendance_Employee_Date").IsUnique();
+
+            entity.Property(e => e.CheckInTime).HasColumnType("time");
+            entity.Property(e => e.CheckOutTime).HasColumnType("time");
+
+            entity.HasOne(d => d.Employee).WithMany(p => p.Attendances)
+                .HasForeignKey(d => d.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Attendance_Users");
+
+            entity.HasOne(d => d.Period).WithMany(p => p.Attendances)
+                .HasForeignKey(d => d.PeriodId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Attendance_Periods");
         });
 
         modelBuilder.Entity<Request>(entity =>

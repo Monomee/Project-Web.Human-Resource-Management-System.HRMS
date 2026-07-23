@@ -1,0 +1,315 @@
+@page "/attendance/my-attendance"
+@rendermode InteractiveServer
+
+@using HRMS.Application.Interfaces
+@using HRMS.Application.DTOs.Attendance
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+
+@inject IAttendanceService AttendanceService
+@inject IApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Điểm danh cá nhân — HRMS</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h2 class="h3 fw-bold text-primary mb-1">
+                <i class="bi bi-clock-history me-2"></i>Điểm danh Cá nhân
+            </h2>
+            <p class="text-muted mb-0">Thực hiện Check In / Check Out và theo dõi lịch sử điểm danh hàng ngày.</p>
+        </div>
+        <div class="col-auto">
+            <div class="badge bg-light text-dark fs-6 p-2 border">
+                <i class="bi bi-calendar3 me-1 text-primary"></i>
+                Hôm nay: <strong>@DateTime.Now.ToString("dd/MM/yyyy")</strong>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@_errorMessage
+            <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm mb-4" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>@_successMessage
+            <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+        </div>
+    }
+
+    <!-- THÔNG TIN ĐIỂM DANH HÔM NAY -->
+    <div class="card border-0 shadow-sm mb-4 bg-gradient">
+        <div class="card-body p-4">
+            <div class="row g-4 align-items-center">
+                <div class="col-md-5">
+                    <h5 class="fw-bold mb-2">Ca làm việc hôm nay</h5>
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-primary fs-6 me-2">@(_todayAttendance?.ShiftName ?? "Ca Hành Chính Standard")</span>
+                        <span class="text-muted small">@(_todayAttendance?.Status ?? "Chưa có dữ liệu")</span>
+                    </div>
+                    <div class="small text-muted">
+                        <i class="bi bi-info-circle me-1"></i>Vào/Ra chuẩn: 08:00 - 17:30 (Nghỉ trưa: 12:00 - 13:30)
+                    </div>
+                </div>
+
+                <div class="col-md-7">
+                    <div class="row g-3 text-center">
+                        <div class="col-6 col-sm-3">
+                            <div class="p-3 bg-light rounded-3 border">
+                                <div class="small text-muted mb-1">Giờ Check-In</div>
+                                <div class="fw-bold fs-5 text-success">
+                                    @(_todayAttendance?.CheckInTime?.ToString("HH:mm:ss") ?? "--:--:--")
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-3">
+                            <div class="p-3 bg-light rounded-3 border">
+                                <div class="small text-muted mb-1">Giờ Check-Out</div>
+                                <div class="fw-bold fs-5 text-info">
+                                    @(_todayAttendance?.CheckOutTime?.ToString("HH:mm:ss") ?? "--:--:--")
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-6 d-flex align-items-center justify-content-end gap-2">
+                            <button class="btn btn-success btn-lg w-100 shadow-sm"
+                                    disabled="@(_todayAttendance?.CheckInTime != null || _isProcessing)"
+                                    @onclick="HandleCheckIn">
+                                <i class="bi bi-box-arrow-in-right me-1"></i> Check In
+                            </button>
+                            <button class="btn btn-primary btn-lg w-100 shadow-sm"
+                                    disabled="@(_todayAttendance?.CheckInTime == null || _todayAttendance?.CheckOutTime != null || _isProcessing)"
+                                    @onclick="HandleCheckOut">
+                                <i class="bi bi-box-arrow-left me-1"></i> Check Out
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BẢNG LỊCH SỬ CHẤM CÔNG CÁ NHÂN -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold text-secondary">
+                <i class="bi bi-table me-2"></i>Lịch sử Chấm công cá nhân
+            </h5>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="LoadDataAsync">
+                <i class="bi bi-arrow-clockwise me-1"></i>Làm mới
+            </button>
+        </div>
+        <div class="card-body p-0">
+            @if (_isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="text-muted mt-2">Đang tải lịch sử chấm công...</p>
+                </div>
+            }
+            else if (!_history.Any())
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                    Chưa có lịch sử chấm công nào.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Ngày</th>
+                                <th>Ca làm việc</th>
+                                <th>Check In</th>
+                                <th>Check Out</th>
+                                <th class="text-center">Số phút làm</th>
+                                <th class="text-center">Trễ (phút)</th>
+                                <th class="text-center">Sớm (phút)</th>
+                                <th class="text-center">OT (phút)</th>
+                                <th class="text-center">Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in _history)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@item.AttendanceDate.ToString("dd/MM/yyyy")</td>
+                                    <td><span class="badge bg-secondary">@item.ShiftName</span></td>
+                                    <td class="text-success fw-bold">@(item.CheckInTime?.ToString("HH:mm:ss") ?? "-")</td>
+                                    <td class="text-info fw-bold">@(item.CheckOutTime?.ToString("HH:mm:ss") ?? "-")</td>
+                                    <td class="text-center">@item.WorkingMinutes phút</td>
+                                    <td class="text-center">
+                                        @if (item.LateMinutes > 0)
+                                        {
+                                            <span class="badge bg-danger">@item.LateMinutes</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">0</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (item.EarlyLeaveMinutes > 0)
+                                        {
+                                            <span class="badge bg-warning text-dark">@item.EarlyLeaveMinutes</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">0</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (item.OvertimeMinutes > 0)
+                                        {
+                                            <span class="badge bg-success">@item.OvertimeMinutes</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">0</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge @GetStatusBadgeClass(item.Status)">@item.Status</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private int _currentUserId = 0;
+    private bool _isLoading = true;
+    private bool _isProcessing = false;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    private AttendanceDetailDto? _todayAttendance;
+    private List<AttendanceDetailDto> _history = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userClaims = authState.User;
+
+            if (userClaims.Identity?.IsAuthenticated == true)
+            {
+                var nameIdStr = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (int.TryParse(nameIdStr, out int accountId))
+                {
+                    if (accountId == -1) // Account System Admin
+                    {
+                        var firstUser = DbContext.Users.FirstOrDefault();
+                        _currentUserId = firstUser?.Id ?? 1;
+                    }
+                    else
+                    {
+                        var acc = DbContext.Accounts.FirstOrDefault(a => a.Id == accountId);
+                        _currentUserId = acc?.UserId ?? 0;
+                    }
+                }
+            }
+
+            if (_currentUserId > 0)
+            {
+                var today = DateOnly.FromDateTime(DateTime.Now);
+                _todayAttendance = await AttendanceService.GetTodayAttendanceAsync(_currentUserId, today);
+                _history = await AttendanceService.GetAttendanceHistoryAsync(_currentUserId, null, null);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Không thể tải dữ liệu điểm danh: " + ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleCheckIn()
+    {
+        if (_currentUserId <= 0) return;
+        _isProcessing = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            var now = DateTime.Now;
+            var today = DateOnly.FromDateTime(now);
+            var timeNow = TimeOnly.FromDateTime(now);
+
+            await AttendanceService.CheckInAsync(_currentUserId, today, timeNow);
+            _successMessage = $"Check-In thành công lúc {timeNow:HH:mm:ss}!";
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task HandleCheckOut()
+    {
+        if (_currentUserId <= 0) return;
+        _isProcessing = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            var now = DateTime.Now;
+            var today = DateOnly.FromDateTime(now);
+            var timeNow = TimeOnly.FromDateTime(now);
+
+            await AttendanceService.CheckOutAsync(_currentUserId, today, timeNow);
+            _successMessage = $"Check-Out thành công lúc {timeNow:HH:mm:ss}!";
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "Đủ công" => "bg-success",
+        "Đi muộn" => "bg-danger",
+        "Về sớm" => "bg-warning text-dark",
+        "Đi muộn & Về sớm" => "bg-danger",
+        "Chưa check-out" => "bg-info text-dark",
+        "Vắng mặt" => "bg-secondary",
+        _ => "bg-primary"
+    };
+}

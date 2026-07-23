@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Threading.Tasks;
 using HRMS.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +20,12 @@ namespace HRMS.Application.Interfaces
         DbSet<RequestType> RequestTypes { get; }
         DbSet<LeaveBalance> LeaveBalances { get; }
         DbSet<Account> Accounts { get; }
+        DbSet<Shift> Shifts { get; }
+        DbSet<ShiftAssignment> ShiftAssignments { get; }
+        DbSet<Attendance> Attendances { get; }
+        DbSet<Position> Positions { get; }
+        DbSet<User> Users { get; }
+        DbSet<Department> Departments { get; }
 
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     }

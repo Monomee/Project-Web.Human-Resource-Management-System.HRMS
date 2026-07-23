@@ -110,9 +110,9 @@ public class DashboardService : IDashboardService
 
             if (latestPeriod != null)
             {
-                myWorkDaysInLatestPeriod = await _context.AttendanceLogs
-                    .Where(log => log.UserId == userId && log.PeriodId == latestPeriod.Id)
-                    .Select(log => log.CheckedAt.Date)
+                myWorkDaysInLatestPeriod = await _context.Attendances
+                    .Where(a => a.EmployeeId == userId && a.PeriodId == latestPeriod.Id && a.CheckInTime != null)
+                    .Select(a => a.AttendanceDate)
                     .Distinct()
                     .CountAsync();
             }

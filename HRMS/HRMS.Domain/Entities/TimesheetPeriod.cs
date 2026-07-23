@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HRMS.Domain.Entities;
@@ -15,7 +15,7 @@ public partial class TimesheetPeriod
 
     public bool IsLocked { get; set; }
 
-    public virtual ICollection<AttendanceLog> AttendanceLogs { get; set; } = new List<AttendanceLog>();
+    public virtual ICollection<Attendance> Attendances { get; set; } = new List<Attendance>();
 
     public virtual ICollection<Payslip> Payslips { get; set; } = new List<Payslip>();
 }

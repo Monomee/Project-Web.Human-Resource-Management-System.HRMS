@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HRMS.Domain.Entities;
@@ -27,8 +27,6 @@ public partial class User
 
     public virtual Account? Account { get; set; }
 
-    public virtual ICollection<AttendanceLog> AttendanceLogs { get; set; } = new List<AttendanceLog>();
-
     public virtual Department Department { get; set; } = null!;
 
     public virtual ICollection<EmploymentContract> EmploymentContracts { get; set; } = new List<EmploymentContract>();
@@ -38,4 +36,8 @@ public partial class User
     public virtual ICollection<Payslip> Payslips { get; set; } = new List<Payslip>();
 
     public virtual Position Position { get; set; } = null!;
+
+    public virtual ICollection<Attendance> Attendances { get; set; } = new List<Attendance>();
+
+    public virtual ICollection<ShiftAssignment> ShiftAssignments { get; set; } = new List<ShiftAssignment>();
 }
