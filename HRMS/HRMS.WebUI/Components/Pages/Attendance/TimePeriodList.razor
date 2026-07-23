@@ -1,245 +1,364 @@
 @page "/attendance/periods"
 @rendermode InteractiveServer
 
-@*
-    TimePeriodList.razor — Quản lý Kỳ công (TimesheetPeriod)
-
-    Chức năng:
-      - Hiển thị danh sách tất cả kỳ công dưới dạng bảng.
-      - Nút "Tạo kỳ công mới" chuyển hướng sang trang tạo mới: /attendance/periods/create.
-      - Nút "Sửa" trên mỗi dòng (kỳ công chưa khóa) chuyển hướng sang trang sửa: /attendance/periods/edit/{Id}.
-      - Kỳ đã khóa: hiển thị gạch ngang (không cho sửa).
-*@
-
 @using HRMS.Application.Interfaces
+@using HRMS.Application.DTOs.TimePeriod
 @inject ITimePeriodService TimePeriodService
 @inject NavigationManager Navigation
 
 <PageTitle>Quản lý Kỳ công — HRMS</PageTitle>
 
-<div class="tp-page">
-
-    @* ── TIÊU ĐỀ TRANG ── *@
-    <div class="tp-header">
-        <div class="tp-header-icon">📅</div>
-        <div class="tp-header-text">
-            <h1 class="tp-title">Quản lý Kỳ công</h1>
-            <p class="tp-subtitle">Tạo và quản lý các kỳ tính công theo tháng / quý.</p>
+<div class="container-fluid mt-4">
+    @* ── HEADER TRANG ── *@
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="page-title">
+                <i class="bi bi-calendar-range-fill me-2 text-primary"></i>Quản lý Kỳ công
+            </h2>
+            <p class="page-subtitle">Tạo, cập nhật và khóa sổ các kỳ tính công hàng tháng cho toàn bộ doanh nghiệp</p>
         </div>
-        <a class="btn btn-primary" href="/attendance/periods/create">
-            ＋ Tạo kỳ công mới
-        </a>
     </div>
 
+    @* ── BANNER THÔNG BÁO LỖI / THÀNH CÔNG ── *@
     @if (!string.IsNullOrEmpty(_errorMessage))
     {
-        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+        <div class="alert alert-danger-dark mb-3">
             <i class="bi bi-exclamation-triangle-fill me-2"></i>@_errorMessage
-            <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+            <button type="button" class="btn-close btn-close-white float-end" @onclick="() => _errorMessage = null"></button>
         </div>
     }
 
     @if (!string.IsNullOrEmpty(_successMessage))
     {
-        <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+        <div class="alert alert-success-dark mb-3">
             <i class="bi bi-check-circle-fill me-2"></i>@_successMessage
-            <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+            <button type="button" class="btn-close btn-close-white float-end" @onclick="() => _successMessage = null"></button>
         </div>
     }
 
-    @* ── BẢNG DANH SÁCH KỲ CÔNG ── *@
     @if (_isLoading)
     {
-        <div class="tp-loading">⏳ Đang tải dữ liệu...</div>
-    }
-    else if (_periods.Count == 0)
-    {
-        <div class="tp-empty">
-            <span>📭</span>
-            <p>Chưa có kỳ công nào. Hãy tạo kỳ công đầu tiên!</p>
-            <a class="btn btn-primary" href="/attendance/periods/create">Tạo ngay</a>
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+            <p class="mt-3 text-muted-light">Đang tải danh sách kỳ công...</p>
         </div>
     }
     else
     {
-        <div class="tp-table-wrapper">
-            <table class="tp-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Tên kỳ công</th>
-                        <th>Bắt đầu</th>
-                        <th>Kết thúc</th>
-                        <th>Số ngày</th>
-                        <th>Trạng thái</th>
-                        <th>Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (int i = 0; i < _periods.Count; i++)
-                    {
-                        var p = _periods[i];
-                        var rowNum = i + 1;
-                        <tr class="@(p.IsLocked ? "row-locked" : "row-open")">
-                            <td class="td-num">@rowNum</td>
-                            <td class="td-name">@p.Name</td>
-                            <td class="td-date">@p.StartDate.ToString("dd/MM/yyyy")</td>
-                            <td class="td-date">@p.EndDate.ToString("dd/MM/yyyy")</td>
-                            <td class="td-center">
-                                @(p.EndDate.DayNumber - p.StartDate.DayNumber + 1) ngày
-                            </td>
-                            <td class="td-center">
-                                @if (p.IsLocked)
-                                {
-                                    <span class="badge badge-locked">🔒 Đã khóa</span>
-                                }
-                                else
-                                {
-                                    <span class="badge badge-open">✅ Đang mở</span>
-                                }
-                            </td>
-                            <td class="td-actions">
-                                @if (!p.IsLocked)
-                                {
-                                    <a class="btn-icon btn-edit me-1"
-                                       title="Sửa kỳ công này"
-                                       href="/attendance/periods/edit/@p.Id">
-                                        ✏️ Sửa
-                                    </a>
-                                    <button class="btn-icon btn-lock"
-                                            title="Khóa sổ kỳ công này"
-                                            @onclick="() => ToggleLockAsync(p, true)">
-                                        🔒 Khóa kỳ
-                                    </button>
-                                }
-                                else
-                                {
-                                    <button class="btn-icon btn-unlock"
-                                            title="Mở khóa kỳ công này"
-                                            @onclick="() => ToggleLockAsync(p, false)">
-                                        🔓 Mở khóa
-                                    </button>
-                                }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+        @* ── TABLE TOOLBAR ── *@
+        <div class="table-toolbar mb-0">
+            <div class="toolbar-left">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge-dark badge-department">
+                        <i class="bi bi-calendar-event me-1"></i>Tổng số: @_periods.Count kỳ công
+                    </span>
+                </div>
+            </div>
+
+            <div class="toolbar-right">
+                <a class="btn-add-new text-decoration-none" href="/attendance/periods/create">
+                    <i class="bi bi-plus-circle me-2"></i>Tạo kỳ công mới
+                </a>
+            </div>
+        </div>
+
+        @* ── BẢNG DANH SÁCH KỲ CÔNG (DARK GLASSMORPHIC TABLE) ── *@
+        <div class="card-dark mb-4">
+            @if (_periods.Count == 0)
+            {
+                <div class="text-center py-5 text-muted-light">
+                    <i class="bi bi-calendar-x fs-1 d-block mb-2 text-muted"></i>
+                    <p class="mb-2">Chưa có kỳ công nào trong hệ thống.</p>
+                    <a class="btn-add-new text-decoration-none d-inline-flex" href="/attendance/periods/create">
+                        <i class="bi bi-plus-circle me-2"></i>Tạo kỳ công đầu tiên
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table-dark-custom">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">#</th>
+                                <th>Tên kỳ công</th>
+                                <th>Ngày bắt đầu</th>
+                                <th>Ngày kết thúc</th>
+                                <th class="text-center">Số ngày công</th>
+                                <th class="text-center">Trạng thái</th>
+                                <th class="text-center" style="width: 200px;">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (int i = 0; i < _periods.Count; i++)
+                            {
+                                var p = _periods[i];
+                                var rowNum = i + 1;
+                                <tr class="@(p.IsLocked ? "opacity-75" : "")">
+                                    <td class="text-muted font-monospace">@rowNum</td>
+                                    <td>
+                                        <div class="employee-name-primary fs-6">@p.Name</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge-dark badge-department font-monospace">
+                                            <i class="bi bi-calendar-check me-1 text-info"></i>@p.StartDate.ToString("dd/MM/yyyy")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge-dark badge-department font-monospace">
+                                            <i class="bi bi-calendar-x me-1 text-warning"></i>@p.EndDate.ToString("dd/MM/yyyy")
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="text-muted-light fw-semibold">
+                                            @(p.EndDate.DayNumber - p.StartDate.DayNumber + 1) ngày
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        @if (p.IsLocked)
+                                        {
+                                            <span class="badge-dark badge-inactive">
+                                                <i class="bi bi-lock-fill me-1"></i>Đã khóa sổ
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge-dark badge-active">
+                                                <i class="bi bi-check-circle-fill me-1"></i>Đang mở
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="action-icons justify-content-center">
+                                            @if (!p.IsLocked)
+                                            {
+                                                <a class="icon-btn icon-edit text-decoration-none"
+                                                   href="/attendance/periods/edit/@p.Id"
+                                                   title="Chỉnh sửa kỳ công">
+                                                    <i class="bi bi-pencil-fill"></i>
+                                                </a>
+                                                <button class="icon-btn text-danger"
+                                                        style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);"
+                                                        @onclick="() => ToggleLockAsync(p, true)"
+                                                        title="Khóa sổ kỳ công này">
+                                                    <i class="bi bi-lock-fill"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="icon-btn text-success"
+                                                        style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);"
+                                                        @onclick="() => ToggleLockAsync(p, false)"
+                                                        title="Mở khóa kỳ công này">
+                                                    <i class="bi bi-unlock-fill"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         </div>
     }
-
 </div>
 
-@* ── STYLE ── *@
 <style>
-    .tp-page {
-        max-width: 1100px;
-        margin: 0 auto;
-        padding: 2rem 1.5rem;
-        font-family: 'Segoe UI', system-ui, sans-serif;
+    /* ============================================
+       DARK THEME FOR ATTENDANCE MANAGEMENT
+       ============================================ */
+    .page-title {
+        color: #f1f5f9;
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
     }
 
-    /* Header */
-    .tp-header {
+    .page-subtitle {
+        color: #94a3b8;
+        font-size: 0.95rem;
+        margin-bottom: 0;
+    }
+
+    .text-muted-light {
+        color: #94a3b8 !important;
+    }
+
+    /* Table Toolbar */
+    .table-toolbar {
         display: flex;
         align-items: center;
-        gap: 1.2rem;
-        margin-bottom: 2rem;
-        padding-bottom: 1.5rem;
-        border-bottom: 2px solid #e8ecf0;
-        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 1.5rem;
+        padding: 1.25rem 1.5rem;
+        background: rgba(20, 23, 38, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px 12px 0 0;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
     }
-    .tp-header-icon  { font-size: 2.4rem; }
-    .tp-header-text  { flex: 1; }
-    .tp-title {
-        font-size: 1.75rem;
-        font-weight: 700;
-        color: white;
-        margin: 0 0 0.2rem 0;
-    }
-    .tp-subtitle { color: white; margin: 0; font-size: 0.93rem; }
 
-    /* Loading / Empty */
-    .tp-loading { text-align: center; color: #9ca3af; padding: 3rem; font-size: 1rem; }
-    .tp-empty   { text-align: center; padding: 4rem 2rem; color: #6b7280; }
-    .tp-empty span { font-size: 3rem; display: block; margin-bottom: 0.75rem; }
-
-    /* Table */
-    .tp-table-wrapper {
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-    .tp-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    .tp-table thead th {
-        background: #f1f5f9;
-        color: #475569;
-        font-weight: 700;
-        padding: 0.85rem 1rem;
-        text-align: left;
-        border-bottom: 2px solid #e2e8f0;
-        white-space: nowrap;
-    }
-    .tp-table tbody tr { transition: background 0.15s; }
-    .tp-table tbody tr:hover { background: #f8fafc; }
-    .tp-table td {
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid #f1f5f9;
-        color: #374151;
-        vertical-align: middle;
-    }
-    .row-locked { background: #fafafa; }
-    .row-open   { background: #fff; }
-
-    .td-num    { width: 48px; color: #9ca3af; font-size: 0.82rem; }
-    .td-name   { font-weight: 600; }
-    .td-date   { font-family: monospace; font-size: 0.88rem; }
-    .td-center { text-align: center; }
-    .td-actions{ text-align: center; }
-
-    /* Badges */
-    .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
-    .badge-locked { background: #f1f5f9; color: #64748b; }
-    .badge-open   { background: #dcfce7; color: #15803d; }
-
-    /* Action buttons */
-    .btn-icon {
-        display: inline-block;
-        background: #eff6ff;
-        border: 1px solid #bfdbfe;
-        color: #2563eb;
-        cursor: pointer;
-        font-size: 0.82rem;
-        padding: 0.3rem 0.7rem;
-        border-radius: 6px;
-        font-weight: 600;
-        text-decoration: none;
-        transition: background 0.15s;
-    }
-    .btn-icon:hover { background: #dbeafe; }
-    .btn-lock { background: #fff1f2; border: 1px solid #fecdd3; color: #e11d48; }
-    .btn-lock:hover { background: #ffe4e6; }
-    .btn-unlock { background: #f0fdf4; border: 1px solid #bbf7d0; color: #16a34a; }
-    .btn-unlock:hover { background: #dcfce7; }
-    .locked-hint    { color: #d1d5db; font-size: 0.85rem; }
-
-    /* Buttons */
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        padding: 0.6rem 1.3rem;
+    /* Add New Button */
+    .btn-add-new {
+        height: 42px;
+        padding: 0 1.5rem;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
         border: none;
         border-radius: 8px;
-        font-size: 0.93rem;
-        font-weight: 600;
+        color: white;
+        font-weight: 500;
+        font-size: 0.9rem;
         cursor: pointer;
-        transition: opacity 0.2s, transform 0.15s;
-        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
     }
-    .btn:hover { opacity: 0.88; transform: translateY(-1px); }
-    .btn-primary   { background: #4f7ef7; color: #fff; }
+
+    .btn-add-new:hover {
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Card Dark */
+    .card-dark {
+        background: rgba(20, 23, 38, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 0 0 12px 12px;
+        border-top: none;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 0;
+        overflow: hidden;
+    }
+
+    /* Table Dark Custom */
+    .table-dark-custom {
+        width: 100%;
+        margin-bottom: 0;
+        color: #e2e8f0;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .table-dark-custom thead {
+        background: rgba(30, 41, 59, 0.8);
+        border-bottom: 2px solid rgba(100, 116, 139, 0.3);
+    }
+
+    .table-dark-custom thead th {
+        padding: 1rem 1.25rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #cbd5e1;
+        border: none;
+    }
+
+    .table-dark-custom tbody tr {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        transition: background-color 0.2s ease;
+    }
+
+    .table-dark-custom tbody tr:hover {
+        background: rgba(51, 65, 85, 0.4);
+    }
+
+    .table-dark-custom tbody td {
+        padding: 1rem 1.25rem;
+        vertical-align: middle;
+        border: none;
+    }
+
+    .employee-name-primary {
+        color: #f1f5f9;
+        font-weight: 600;
+    }
+
+    /* Badges Dark */
+    .badge-dark {
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .badge-department {
+        background: rgba(51, 65, 85, 0.5);
+        color: #cbd5e1;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .badge-active {
+        background: rgba(34, 197, 94, 0.15);
+        color: #4ade80;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .badge-inactive {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    /* Action Buttons */
+    .action-icons {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .icon-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.9rem;
+    }
+
+    .icon-edit {
+        background: rgba(59, 130, 246, 0.15);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .icon-edit:hover {
+        background: rgba(59, 130, 246, 0.3);
+        color: #93c5fd;
+        transform: translateY(-2px);
+    }
+
+    /* Dark Alerts */
+    .alert-danger-dark {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        padding: 0.75rem 1.25rem;
+    }
+
+    .alert-success-dark {
+        background: rgba(34, 197, 94, 0.15);
+        color: #86efac;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        border-radius: 8px;
+        padding: 0.75rem 1.25rem;
+    }
 </style>
 
 @code {

@@ -1,246 +1,241 @@
 @page "/attendance/periods/edit/{id:int}"
 @rendermode InteractiveServer
 
-@*
-    EditTimePeriod.razor — Trang sửa đổi Kỳ công (TimesheetPeriod)
-
-    Chức năng:
-      - Tải dữ liệu kỳ công hiện tại dựa trên ID lấy từ Route Parameter.
-      - Kiểm tra tính hợp lệ: Nếu kỳ đã bị khóa (IsLocked = true), chặn không cho phép chỉnh sửa và hiển thị cảnh báo.
-      - Gọi TimePeriodService.UpdateAsync để cập nhật thay đổi.
-      - Thành công: chuyển hướng về trang danh sách.
-*@
-
 @using HRMS.Application.Interfaces
 @using HRMS.Application.DTOs.TimePeriod
 @inject ITimePeriodService TimePeriodService
 @inject NavigationManager Navigation
 
-<PageTitle>Sửa kỳ công — HRMS</PageTitle>
+<PageTitle>Sửa Kỳ công — HRMS</PageTitle>
 
-<div class="tp-form-page">
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-9 col-lg-7 col-xl-6">
 
-    @* ── TIÊU ĐỀ TRANG & LINK QUAY LẠI ── *@
-    <div class="page-header">
-        <a class="btn-back" href="/attendance/periods">⬅ Quay lại danh sách</a>
-        <h1 class="page-title">✏️ Sửa kỳ công</h1>
-        <p class="page-subtitle">Cập nhật thông tin chi tiết của kỳ tính công.</p>
-    </div>
-
-    @* ── THÔNG BÁO LỖI (Nghiệp vụ hoặc tải dữ liệu) ── *@
-    @if (_errorMessage != null)
-    {
-        <div class="alert alert-error">⚠️ @_errorMessage</div>
-    }
-
-    @if (_isLoading)
-    {
-        <div class="form-loading">⏳ Đang tải dữ liệu kỳ công...</div>
-    }
-    else if (_periodDetail == null)
-    {
-        <div class="form-empty">
-            <p>Không tìm thấy kỳ công yêu cầu hoặc dữ liệu không tồn tại.</p>
-            <a class="btn btn-secondary" href="/attendance/periods">Trở lại danh sách</a>
-        </div>
-    }
-    else
-    {
-        @* ── BANNER CẢNH BÁO KỲ ĐÃ KHÓA ── *@
-        @if (_periodDetail.IsLocked)
-        {
-            <div class="alert alert-locked-banner">
-                🔒 <strong>Kỳ công đã khóa:</strong> Kỳ công này đã bị khóa và không thể chỉnh sửa thông tin.
-                Vui lòng liên hệ Admin để mở khóa nếu thực sự cần thiết.
+            <div class="mb-4">
+                <a class="btn-back text-decoration-none d-inline-flex align-items-center mb-3" href="/attendance/periods">
+                    <i class="bi bi-arrow-left me-2"></i>Quay lại danh sách
+                </a>
+                <h2 class="page-title">
+                    <i class="bi bi-pencil-square me-2 text-primary"></i>Chỉnh sửa Kỳ công
+                </h2>
+                <p class="page-subtitle">Cập nhật thông tin chi tiết của kỳ tính công trong hệ thống</p>
             </div>
-        }
 
-        <div class="form-container">
-            <EditForm Model="_editDto" OnValidSubmit="HandleSubmit" FormName="edit-period-page-form">
-                <DataAnnotationsValidator />
+            @if (_errorMessage != null)
+            {
+                <div class="alert alert-danger-dark mb-4">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>@_errorMessage
+                    <button type="button" class="btn-close btn-close-white float-end" @onclick="() => _errorMessage = null"></button>
+                </div>
+            }
 
-                <div class="form-body">
-                    
-                    @* Tên kỳ công *@
-                    <div class="form-field">
-                        <label class="form-label">
-                            Tên kỳ công <span class="required">*</span>
-                        </label>
-                        <InputText class="form-input"
-                                   placeholder="VD: Tháng 07/2026"
-                                   disabled="@_periodDetail.IsLocked"
-                                   @bind-Value="_editDto.Name" />
-                        <ValidationMessage For="() => _editDto.Name" class="form-error" />
+            @if (_isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Đang tải...</span>
                     </div>
+                    <p class="mt-3 text-muted-light">Đang tải thông tin kỳ công...</p>
+                </div>
+            }
+            else if (_periodDetail == null)
+            {
+                <div class="card-dark-form p-5 text-center">
+                    <i class="bi bi-exclamation-circle text-warning fs-1 d-block mb-3"></i>
+                    <p class="text-muted-light fs-5 mb-3">Không tìm thấy kỳ công yêu cầu hoặc dữ liệu không tồn tại.</p>
+                    <div>
+                        <a class="btn-cancel text-decoration-none d-inline-flex" href="/attendance/periods">Trở lại danh sách</a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                @if (_periodDetail.IsLocked)
+                {
+                    <div class="alert alert-warning-dark mb-4">
+                        <i class="bi bi-lock-fill me-2"></i>
+                        <strong>Kỳ công đã bị khóa sổ:</strong> Kỳ công này đã bị đóng và không thể thay đổi thông tin. Vui lòng mở khóa trước khi chỉnh sửa.
+                    </div>
+                }
 
-                    @* Khoảng thời gian *@
-                    <div class="form-row">
-                        <div class="form-field">
-                            <label class="form-label">
-                                Ngày bắt đầu <span class="required">*</span>
+                <div class="card-dark-form p-4">
+                    <EditForm Model="_editDto" OnValidSubmit="HandleSubmit" FormName="edit-period-page-form">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-4">
+                            <label class="form-label-dark">
+                                Tên kỳ công <span class="text-danger">*</span>
                             </label>
-                            <InputDate class="form-input"
+                            <InputText class="form-control-dark"
+                                       placeholder="Ví dụ: Tháng 07/2026"
                                        disabled="@_periodDetail.IsLocked"
-                                       @bind-Value="_editDto.StartDate" />
-                            <ValidationMessage For="() => _editDto.StartDate" class="form-error" />
+                                       @bind-Value="_editDto.Name" />
+                            <ValidationMessage For="() => _editDto.Name" class="text-danger small mt-1" />
                         </div>
 
-                        <div class="form-field">
-                            <label class="form-label">
-                                Ngày kết thúc <span class="required">*</span>
-                            </label>
-                            <InputDate class="form-input"
-                                       disabled="@_periodDetail.IsLocked"
-                                       @bind-Value="_editDto.EndDate" />
-                            <ValidationMessage For="() => _editDto.EndDate" class="form-error" />
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label-dark">
+                                    Ngày bắt đầu <span class="text-danger">*</span>
+                                </label>
+                                <InputDate class="form-control-dark" disabled="@_periodDetail.IsLocked" @bind-Value="_editDto.StartDate" />
+                                <ValidationMessage For="() => _editDto.StartDate" class="text-danger small mt-1" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label-dark">
+                                    Ngày kết thúc <span class="text-danger">*</span>
+                                </label>
+                                <InputDate class="form-control-dark" disabled="@_periodDetail.IsLocked" @bind-Value="_editDto.EndDate" />
+                                <ValidationMessage For="() => _editDto.EndDate" class="text-danger small mt-1" />
+                            </div>
                         </div>
-                    </div>
 
+                        <div class="d-flex justify-content-end gap-3 pt-3 border-top border-secondary border-opacity-25">
+                            <a class="btn-cancel text-decoration-none" href="/attendance/periods">Hủy bỏ</a>
+                            <button type="submit" class="btn-save" disabled="@(_isSubmitting || _periodDetail.IsLocked)">
+                                @if (_isSubmitting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    <span>Đang lưu...</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    <span>Lưu thay đổi</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
                 </div>
+            }
 
-                <div class="form-footer">
-                    <a class="btn btn-secondary" href="/attendance/periods">Hủy</a>
-                    @if (!_periodDetail.IsLocked)
-                    {
-                        <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
-                            @if (_isSubmitting)
-                            {
-                                <span class="spinner"></span>
-                                <span>Đang lưu...</span>
-                            }
-                            else
-                            {
-                                <span>💾 Lưu thay đổi</span>
-                            }
-                        </button>
-                    }
-                </div>
-
-            </EditForm>
         </div>
-    }
-
+    </div>
 </div>
 
-@* ── STYLE ── *@
 <style>
-    .tp-form-page {
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 2rem 1.5rem;
-        font-family: 'Segoe UI', system-ui, sans-serif;
-    }
-
-    .page-header {
-        margin-bottom: 2rem;
-        padding-bottom: 1rem;
-        border-bottom: 2px solid #e8ecf0;
-    }
-    .btn-back {
-        display: inline-block;
-        color: #4f7ef7;
-        text-decoration: none;
+    .page-title {
+        color: #f1f5f9;
+        font-size: 1.75rem;
         font-weight: 600;
-        font-size: 0.9rem;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
     }
-    .btn-back:hover { text-decoration: underline; }
-    .page-title { font-size: 1.65rem; font-weight: 700; color: white; margin: 0 0 0.3rem 0; }
-    .page-subtitle { color: white; margin: 0; font-size: 0.92rem; }
 
-    /* Form Container */
-    .form-container {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-        overflow: hidden;
-    }
-    .form-body   { padding: 1.75rem; }
-    .form-footer {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.75rem;
-        padding: 1.1rem 1.75rem;
-        background: #f8fafc;
-        border-top: 1px solid #e2e8f0;
-    }
-    .form-loading, .form-empty { text-align: center; color: #9ca3af; padding: 3rem; }
-
-    /* Fields */
-    .form-field { margin-bottom: 1.25rem; }
-    .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
-    .form-label {
-        display: block; font-weight: 600; color: #374151;
-        font-size: 0.88rem; margin-bottom: 0.45rem;
-    }
-    .required { color: #ef4444; margin-left: 2px; }
-    .form-input {
-        width: 100%;
-        padding: 0.65rem 0.9rem;
-        border: 1.5px solid #d1d5db;
-        border-radius: 8px;
+    .page-subtitle {
+        color: #94a3b8;
         font-size: 0.95rem;
-        color: #374151;
-        background: #f9fafb;
-        box-sizing: border-box;
-        transition: border-color 0.2s;
+        margin-bottom: 0;
     }
-    .form-input:focus:not(:disabled) { border-color: #4f7ef7; background: #fff; outline: none; }
-    .form-input:disabled { background: #e2e8f0; color: #9ca3af; cursor: not-allowed; border-color: #cbd5e1; }
 
-    .form-error { color: #ef4444; font-size: 0.82rem; margin-top: 0.3rem; display: block; }
+    .btn-back {
+        color: #94a3b8;
+        font-size: 0.9rem;
+        transition: color 0.2s;
+    }
+    .btn-back:hover {
+        color: #38bdf8;
+    }
 
-    /* Buttons */
-    .btn {
+    .card-dark-form {
+        background: rgba(20, 23, 38, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+    }
+
+    .form-label-dark {
+        color: #cbd5e1;
+        font-weight: 500;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    .form-control-dark {
+        width: 100%;
+        height: 42px;
+        padding: 0.5rem 1rem;
+        background: rgba(30, 41, 59, 0.6) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: #e2e8f0 !important;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-control-dark:focus {
+        background: rgba(30, 41, 59, 0.8) !important;
+        border-color: rgba(59, 130, 246, 0.5);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        outline: none;
+    }
+
+    .btn-cancel {
+        height: 42px;
+        padding: 0 1.25rem;
+        background: rgba(51, 65, 85, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: #cbd5e1;
+        font-weight: 500;
         display: inline-flex;
         align-items: center;
-        gap: 0.4rem;
-        padding: 0.65rem 1.4rem;
+        transition: all 0.2s ease;
+    }
+    .btn-cancel:hover {
+        background: rgba(51, 65, 85, 0.8);
+        color: white;
+    }
+
+    .btn-save {
+        height: 42px;
+        padding: 0 1.5rem;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
         border: none;
         border-radius: 8px;
-        font-size: 0.95rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: opacity 0.2s, transform 0.15s;
-        text-decoration: none;
-    }
-    .btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
-    .btn-primary   { background: #4f7ef7; color: #fff; }
-    .btn-secondary { background: #e5e7eb; color: #374151; }
-
-    /* Alerts */
-    .alert {
-        padding: 0.85rem 1.1rem;
-        border-radius: 8px;
-        font-size: 0.92rem;
+        color: white;
         font-weight: 500;
-        margin-bottom: 1.25rem;
+        font-size: 0.9rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
     }
-    .alert-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-    .alert-locked-banner { background: #fffbeb; color: #92400e; border: 1px solid #fef3c7; }
+    .btn-save:hover {
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        transform: translateY(-2px);
+    }
 
-    /* Spinner */
-    .spinner {
-        width: 14px; height: 14px;
-        border: 2px solid rgba(255,255,255,0.35);
-        border-top-color: #fff;
-        border-radius: 50%;
-        animation: spin 0.7s linear infinite;
-        display: inline-block;
+    .alert-danger-dark {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        padding: 0.75rem 1.25rem;
     }
-    @@keyframes spin { to { transform: rotate(360deg); } }
+
+    .alert-warning-dark {
+        background: rgba(245, 158, 11, 0.15);
+        color: #fcd34d;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 8px;
+        padding: 0.75rem 1.25rem;
+    }
 </style>
 
 @code {
-    [Parameter]
-    public int Id { get; set; }
+    [Parameter] public int id { get; set; }
 
-    private TimesheetPeriodDto?       _periodDetail = null;
-    private UpdateTimesheetPeriodDto  _editDto      = new();
-    private bool                      _isLoading    = true;
-    private bool                      _isSubmitting = false;
-    private string?                   _errorMessage = null;
+    private TimesheetPeriodDto? _periodDetail;
+    private UpdateTimesheetPeriodDto _editDto = new();
+    private bool _isLoading = true;
+    private bool _isSubmitting = false;
+    private string? _errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -251,23 +246,23 @@
     {
         _isLoading = true;
         _errorMessage = null;
+
         try
         {
-            _periodDetail = await TimePeriodService.GetByIdAsync(Id);
+            _periodDetail = await TimePeriodService.GetByIdAsync(id);
             if (_periodDetail != null)
             {
-                // Gán dữ liệu sang DTO của form
                 _editDto = new UpdateTimesheetPeriodDto
                 {
-                    Name      = _periodDetail.Name,
+                    Name = _periodDetail.Name,
                     StartDate = _periodDetail.StartDate,
-                    EndDate   = _periodDetail.EndDate
+                    EndDate = _periodDetail.EndDate
                 };
             }
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Lỗi khi tải dữ liệu kỳ công: {ex.Message}";
+            _errorMessage = "Lỗi tải dữ liệu kỳ công: " + ex.Message;
         }
         finally
         {
@@ -277,18 +272,23 @@
 
     private async Task HandleSubmit()
     {
-        if (_periodDetail == null || _periodDetail.IsLocked) return;
+        if (_periodDetail != null && _periodDetail.IsLocked) return;
 
-        _isSubmitting = true;
         _errorMessage = null;
+        _isSubmitting = true;
+
         try
         {
-            await TimePeriodService.UpdateAsync(Id, _editDto);
+            await TimePeriodService.UpdateAsync(id, _editDto);
             Navigation.NavigateTo("/attendance/periods");
         }
         catch (InvalidOperationException ex)
         {
             _errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Có lỗi xảy ra khi cập nhật kỳ công: " + ex.Message;
         }
         finally
         {

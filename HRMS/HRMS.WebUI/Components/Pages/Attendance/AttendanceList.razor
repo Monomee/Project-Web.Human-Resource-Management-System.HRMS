@@ -13,220 +13,295 @@
 
 <PageTitle>Quản lý Chấm công — HRMS</PageTitle>
 
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="h3 fw-bold text-primary mb-1">
-                <i class="bi bi-calendar2-check-fill me-2"></i>Bảng Quản lý Chấm công
+<div class="container-fluid mt-4">
+    @* ── PAGE HEADER ── *@
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h2 class="page-title">
+                <i class="bi bi-calendar2-check-fill me-2 text-primary"></i>Bảng Quản lý Chấm công
             </h2>
-            <p class="text-muted mb-0">Xem kết quả chấm công động (Đi muộn, Về sớm, OT) và chỉnh sửa giờ vào/ra của nhân sự.</p>
+            <p class="page-subtitle">Xem kết quả chấm công động (Đi muộn, Về sớm, OT) và chỉnh sửa giờ vào/ra của nhân sự</p>
         </div>
-        <div>
-            <NavLink href="attendance/shifts" class="btn btn-outline-primary shadow-sm me-2">
-                <i class="bi bi-sliders me-1"></i>Quản lý Ca làm việc
+        <div class="col-auto">
+            <NavLink href="attendance/shifts" class="btn-add-new text-decoration-none">
+                <i class="bi bi-sliders me-2"></i>Quản lý Ca làm việc
             </NavLink>
         </div>
     </div>
 
+    @* ── ALERTS ── *@
     @if (!string.IsNullOrEmpty(_errorMessage))
     {
-        <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4" role="alert">
+        <div class="alert alert-danger-dark mb-4" role="alert">
             <i class="bi bi-exclamation-triangle-fill me-2"></i>@_errorMessage
-            <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+            <button type="button" class="btn-close btn-close-white float-end" @onclick="() => _errorMessage = null"></button>
         </div>
     }
 
     @if (!string.IsNullOrEmpty(_successMessage))
     {
-        <div class="alert alert-success alert-dismissible fade show shadow-sm mb-4" role="alert">
+        <div class="alert alert-success-dark mb-4" role="alert">
             <i class="bi bi-check-circle-fill me-2"></i>@_successMessage
-            <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+            <button type="button" class="btn-close btn-close-white float-end" @onclick="() => _successMessage = null"></button>
         </div>
     }
 
-    <!-- FILTERS -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body p-3">
-            <div class="row g-3 align-items-center">
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold mb-1">📅 Kỳ công</label>
-                    <select class="form-select" value="@_selectedPeriodId" @onchange="OnPeriodSelected">
-                        <option value="0">-- Tất cả kỳ công --</option>
-                        @foreach (var p in _periods)
+    @* ── FILTERS TOOLBAR ── *@
+    <div class="table-toolbar mb-0">
+        <div class="row g-3 align-items-center w-100 m-0">
+            <div class="col-md-3">
+                <label class="form-label-dark small">📅 Kỳ công</label>
+                <select class="filter-select w-100" value="@_selectedPeriodId" @onchange="OnPeriodSelected">
+                    <option value="0">-- Tất cả kỳ công --</option>
+                    @foreach (var p in _periods)
+                    {
+                        <option value="@p.Id">@p.Name (@p.StartDate.ToString("dd/MM") - @p.EndDate.ToString("dd/MM/yyyy"))</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label-dark small">Từ ngày</label>
+                <input type="date" class="form-control-dark" value="@_startDate?.ToString("yyyy-MM-dd")"
+                       @onchange='e => SetDateOnly(d => _startDate = d, e.Value?.ToString())' />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label-dark small">Đến ngày</label>
+                <input type="date" class="form-control-dark" value="@_endDate?.ToString("yyyy-MM-dd")"
+                       @onchange='e => SetDateOnly(d => _endDate = d, e.Value?.ToString())' />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label-dark small">Phòng ban</label>
+                <select class="filter-select w-100" @bind="_selectedDepartmentId">
+                    <option value="0">-- Tất cả phòng ban --</option>
+                    @foreach (var dept in _departments)
+                    {
+                        <option value="@dept.Id">@dept.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end pt-3">
+                <button class="btn-add-new w-100 justify-content-center" @onclick="FilterDataAsync">
+                    <i class="bi bi-search me-1"></i> Lọc dữ liệu
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @* ── TABLE ── *@
+    <div class="card-dark mb-4">
+        @if (_isLoading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-3 text-muted-light">Đang tải danh sách chấm công...</p>
+            </div>
+        }
+        else if (!_attendances.Any())
+        {
+            <div class="text-center py-5 text-muted-light">
+                <i class="bi bi-inbox fs-1 d-block mb-2 text-muted"></i>
+                Không có bản ghi chấm công nào phù hợp với bộ lọc.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table-dark-custom">
+                    <thead>
+                        <tr>
+                            <th>Ngày</th>
+                            <th>Mã NV</th>
+                            <th>Họ và Tên</th>
+                            <th>Phòng ban</th>
+                            <th>Ca làm việc</th>
+                            <th>Check In</th>
+                            <th>Check Out</th>
+                            <th class="text-center">Số phút làm</th>
+                            <th class="text-center">Đi muộn</th>
+                            <th class="text-center">Về sớm</th>
+                            <th class="text-center">Làm OT</th>
+                            <th class="text-center">Trạng thái</th>
+                            <th class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _attendances)
                         {
-                            <option value="@p.Id">@p.Name (@p.StartDate.ToString("dd/MM") - @p.EndDate.ToString("dd/MM/yyyy"))</option>
+                            <tr>
+                                <td class="fw-semibold font-monospace text-info">@item.AttendanceDate.ToString("dd/MM/yyyy")</td>
+                                <td><span class="badge-dark badge-department font-monospace">@item.EmployeeCode</span></td>
+                                <td><span class="employee-name-primary">@item.EmployeeName</span></td>
+                                <td><span class="badge-dark badge-department">@item.DepartmentName</span></td>
+                                <td><span class="badge-dark badge-department text-primary">@item.ShiftName</span></td>
+                                <td><span class="text-success font-monospace fw-bold">@(item.CheckInTime?.ToString("HH:mm:ss") ?? "--:--:--")</span></td>
+                                <td><span class="text-info font-monospace fw-bold">@(item.CheckOutTime?.ToString("HH:mm:ss") ?? "--:--:--")</span></td>
+                                <td class="text-center fw-semibold">@item.WorkingMinutes m</td>
+                                <td class="text-center">
+                                    @if (item.LateMinutes > 0)
+                                    {
+                                        <span class="badge-dark badge-inactive">@item.LateMinutes m</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted-light">0</span>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    @if (item.EarlyLeaveMinutes > 0)
+                                    {
+                                        <span class="badge-dark text-warning border-warning">@item.EarlyLeaveMinutes m</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted-light">0</span>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    @if (item.OvertimeMinutes > 0)
+                                    {
+                                        <span class="badge-dark badge-active">@item.OvertimeMinutes m</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted-light">0</span>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge-dark @GetStatusBadgeClass(item.Status)">@item.Status</span>
+                                </td>
+                                <td class="text-center">
+                                    <button class="icon-btn icon-edit" @onclick="() => OpenEditModal(item)" title="Sửa giờ chấm công">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                </td>
+                            </tr>
                         }
-                    </select>
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@* ── MODAL SỬA GIỜ CHẤM CÔNG (DARK GLASSMORPHIC MODAL) ── *@
+@if (_showEditModal && _editingItem != null)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="card-dark-form modal-content p-4" style="border: 1px solid rgba(255,255,255,0.15);">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary border-opacity-25">
+                    <h5 class="text-white fw-bold mb-0">
+                        <i class="bi bi-pencil-square me-2 text-primary"></i>Chỉnh sửa giờ chấm công
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => _showEditModal = false"></button>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold mb-1">Từ ngày</label>
-                    <input type="date" class="form-control" value="@_startDate?.ToString("yyyy-MM-dd")"
-                           @onchange='e => SetDateOnly(d => _startDate = d, e.Value?.ToString())' />
+                <div class="modal-body p-0">
+                    <div class="mb-3 p-3 rounded-3" style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.08);">
+                        <div class="row g-2 text-muted-light small">
+                            <div class="col-6">Nhân viên: <strong class="text-white">@_editingItem.EmployeeName</strong></div>
+                            <div class="col-6">Mã NV: <strong class="text-white">@_editingItem.EmployeeCode</strong></div>
+                            <div class="col-6">Ngày: <strong class="text-info font-monospace">@_editingItem.AttendanceDate.ToString("dd/MM/yyyy")</strong></div>
+                            <div class="col-6">Ca: <strong class="text-warning">@_editingItem.ShiftName</strong></div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-6">
+                            <label class="form-label-dark text-success">Giờ Check-In</label>
+                            <input type="time" class="form-control-dark" value="@(_editingItem.CheckInTime?.ToString("HH:mm:ss"))"
+                                   @onchange='e => SetTimeOnly(t => _editingItem.CheckInTime = t, e.Value?.ToString())' />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label-dark text-info">Giờ Check-Out</label>
+                            <input type="time" class="form-control-dark" value="@(_editingItem.CheckOutTime?.ToString("HH:mm:ss"))"
+                                   @onchange='e => SetTimeOnly(t => _editingItem.CheckOutTime = t, e.Value?.ToString())' />
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold mb-1">Đến ngày</label>
-                    <input type="date" class="form-control" value="@_endDate?.ToString("yyyy-MM-dd")"
-                           @onchange='e => SetDateOnly(d => _endDate = d, e.Value?.ToString())' />
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold mb-1">Phòng ban</label>
-                    <select class="form-select" @bind="_selectedDepartmentId">
-                        <option value="0">-- Tất cả phòng ban --</option>
-                        @foreach (var dept in _departments)
-                        {
-                            <option value="@dept.Id">@dept.Name</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-md-2 d-flex align-items-end pt-3">
-                    <button class="btn btn-primary w-100 shadow-sm" @onclick="FilterDataAsync">
-                        <i class="bi bi-search me-1"></i> Lọc dữ liệu
+                <div class="d-flex justify-content-end gap-2 pt-3 border-top border-secondary border-opacity-25">
+                    <button type="button" class="btn-cancel" @onclick="() => _showEditModal = false">Hủy</button>
+                    <button type="button" class="btn-save" @onclick="SaveEditAsync">
+                        <i class="bi bi-check-circle me-1"></i> Lưu thay đổi
                     </button>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- TABLE -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-body p-0">
-            @if (_isLoading)
-            {
-                <div class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p class="text-muted mt-2">Đang tải danh sách chấm công...</p>
-                </div>
-            }
-            else if (!_attendances.Any())
-            {
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                    Không có bản ghi chấm công nào phù hợp với bộ lọc.
-                </div>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Ngày</th>
-                                <th>Mã NV</th>
-                                <th>Họ và Tên</th>
-                                <th>Phòng ban</th>
-                                <th>Ca làm việc</th>
-                                <th>Check In</th>
-                                <th>Check Out</th>
-                                <th class="text-center">Số phút làm</th>
-                                <th class="text-center">Đi muộn</th>
-                                <th class="text-center">Về sớm</th>
-                                <th class="text-center">Làm OT</th>
-                                <th class="text-center">Trạng thái</th>
-                                <th class="text-end pe-4">Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var item in _attendances)
-                            {
-                                <tr>
-                                    <td class="fw-semibold">@item.AttendanceDate.ToString("dd/MM/yyyy")</td>
-                                    <td class="fw-bold">@item.EmployeeCode</td>
-                                    <td>@item.EmployeeName</td>
-                                    <td><span class="badge bg-light text-dark border">@item.DepartmentName</span></td>
-                                    <td><span class="badge bg-secondary">@item.ShiftName</span></td>
-                                    <td class="text-success fw-bold">@(item.CheckInTime?.ToString("HH:mm:ss") ?? "-")</td>
-                                    <td class="text-info fw-bold">@(item.CheckOutTime?.ToString("HH:mm:ss") ?? "-")</td>
-                                    <td class="text-center">@item.WorkingMinutes phút</td>
-                                    <td class="text-center">
-                                        @if (item.LateMinutes > 0)
-                                        {
-                                            <span class="badge bg-danger">@item.LateMinutes phút</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted">0</span>
-                                        }
-                                    </td>
-                                    <td class="text-center">
-                                        @if (item.EarlyLeaveMinutes > 0)
-                                        {
-                                            <span class="badge bg-warning text-dark">@item.EarlyLeaveMinutes phút</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted">0</span>
-                                        }
-                                    </td>
-                                    <td class="text-center">
-                                        @if (item.OvertimeMinutes > 0)
-                                        {
-                                            <span class="badge bg-success">@item.OvertimeMinutes phút</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted">0</span>
-                                        }
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge @GetStatusBadgeClass(item.Status)">@item.Status</span>
-                                    </td>
-                                    <td class="text-end pe-4">
-                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(item)">
-                                            <i class="bi bi-pencil-square me-1"></i>Sửa giờ
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        </div>
-    </div>
-</div>
-
-<!-- MODAL SỬA GIỜ CHẤM CÔNG -->
-@if (_showEditModal && _editingItem != null)
-{
-    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title fw-bold">
-                        <i class="bi bi-pencil-square me-2"></i>Chỉnh sửa giờ chấm công
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" @onclick="() => _showEditModal = false"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <div class="mb-3 p-3 bg-light rounded-3 border">
-                        <div class="row">
-                            <div class="col-6"><strong>Nhân viên:</strong> @_editingItem.EmployeeName</div>
-                            <div class="col-6"><strong>Mã NV:</strong> @_editingItem.EmployeeCode</div>
-                            <div class="col-6 mt-2"><strong>Ngày:</strong> @_editingItem.AttendanceDate.ToString("dd/MM/yyyy")</div>
-                            <div class="col-6 mt-2"><strong>Ca làm việc:</strong> @_editingItem.ShiftName</div>
-                        </div>
-                    </div>
-                    <div class="row g-3 mb-3">
-                        <div class="col-6">
-                            <label class="form-label fw-bold text-success">Giờ Check-In</label>
-                            <input type="time" class="form-control" value="@(_editingItem.CheckInTime?.ToString("HH:mm:ss"))"
-                                   @onchange='e => SetTimeOnly(t => _editingItem.CheckInTime = t, e.Value?.ToString())' />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label fw-bold text-info">Giờ Check-Out</label>
-                            <input type="time" class="form-control" value="@(_editingItem.CheckOutTime?.ToString("HH:mm:ss"))"
-                                   @onchange='e => SetTimeOnly(t => _editingItem.CheckOutTime = t, e.Value?.ToString())' />
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" @onclick="() => _showEditModal = false">Hủy</button>
-                    <button type="button" class="btn btn-primary" @onclick="SaveEditAsync">Lưu chỉnh sửa</button>
-                </div>
-            </div>
-        </div>
-    </div>
 }
+
+<style>
+    .page-title { color: #f1f5f9; font-size: 1.75rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .page-subtitle { color: #94a3b8; font-size: 0.95rem; margin-bottom: 0; }
+    .text-muted-light { color: #94a3b8 !important; }
+
+    .table-toolbar {
+        padding: 1.25rem 1.5rem;
+        background: rgba(20, 23, 38, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px 12px 0 0;
+        backdrop-filter: blur(12px);
+    }
+
+    .form-label-dark { color: #cbd5e1; font-weight: 500; font-size: 0.85rem; margin-bottom: 0.4rem; display: block; }
+    .form-control-dark {
+        width: 100%; height: 42px; padding: 0.5rem 1rem;
+        background: rgba(30, 41, 59, 0.6) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px; color: #e2e8f0 !important; font-size: 0.9rem;
+    }
+
+    .filter-select {
+        height: 42px; padding: 0.5rem 2rem 0.5rem 0.75rem;
+        background: rgba(30, 41, 59, 0.6) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px; color: #e2e8f0 !important; font-size: 0.9rem;
+    }
+    .filter-select option { background: #1e293b; color: #e2e8f0; }
+
+    .btn-add-new {
+        height: 42px; padding: 0 1.5rem;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        border: none; border-radius: 8px; color: white;
+        font-weight: 500; font-size: 0.9rem; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s ease;
+    }
+    .btn-add-new:hover { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; transform: translateY(-2px); }
+
+    .card-dark {
+        background: rgba(20, 23, 38, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 0 0 12px 12px; border-top: none;
+        backdrop-filter: blur(12px); padding: 0; overflow: hidden;
+    }
+
+    .card-dark-form {
+        background: rgba(20, 23, 38, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 16px; backdrop-filter: blur(16px);
+    }
+
+    .table-dark-custom { width: 100%; margin-bottom: 0; color: #e2e8f0; border-collapse: separate; border-spacing: 0; }
+    .table-dark-custom thead { background: rgba(30, 41, 59, 0.8); }
+    .table-dark-custom thead th { padding: 1rem 1.25rem; font-weight: 600; font-size: 0.875rem; text-transform: uppercase; color: #cbd5e1; border: none; }
+    .table-dark-custom tbody tr { border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background-color 0.2s ease; }
+    .table-dark-custom tbody tr:hover { background: rgba(51, 65, 85, 0.4); }
+    .table-dark-custom tbody td { padding: 0.9rem 1.25rem; vertical-align: middle; border: none; }
+
+    .employee-name-primary { color: #f1f5f9; font-weight: 600; }
+    .badge-dark { padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.8125rem; font-weight: 500; display: inline-flex; align-items: center; }
+    .badge-department { background: rgba(51, 65, 85, 0.5); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.05); }
+    .badge-active { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+    .badge-inactive { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    .icon-btn { width: 34px; height: 34px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; border: none; cursor: pointer; transition: all 0.2s ease; }
+    .icon-edit { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .icon-edit:hover { background: rgba(59, 130, 246, 0.3); transform: translateY(-2px); }
+
+    .btn-cancel { height: 42px; padding: 0 1.25rem; background: rgba(51, 65, 85, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #cbd5e1; font-weight: 500; display: inline-flex; align-items: center; }
+    .btn-save { height: 42px; padding: 0 1.5rem; background: linear-gradient(135deg, #3b82f6, #2563eb); border: none; border-radius: 8px; color: white; font-weight: 500; display: inline-flex; align-items: center; cursor: pointer; }
+
+    .alert-danger-dark { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 0.75rem 1.25rem; }
+    .alert-success-dark { background: rgba(34, 197, 94, 0.15); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 0.75rem 1.25rem; }
+</style>
 
 @code {
     private bool _isLoading = true;
@@ -308,10 +383,11 @@
             EmployeeId = item.EmployeeId,
             EmployeeCode = item.EmployeeCode,
             EmployeeName = item.EmployeeName,
+            DepartmentName = item.DepartmentName,
             AttendanceDate = item.AttendanceDate,
-            ShiftName = item.ShiftName,
             CheckInTime = item.CheckInTime,
-            CheckOutTime = item.CheckOutTime
+            CheckOutTime = item.CheckOutTime,
+            ShiftName = item.ShiftName
         };
         _showEditModal = true;
     }
@@ -319,39 +395,42 @@
     private async Task SaveEditAsync()
     {
         if (_editingItem == null) return;
+        _errorMessage = null;
+        _successMessage = null;
         try
         {
             await AttendanceService.UpdateAttendanceAsync(_editingItem.Id, _editingItem.CheckInTime, _editingItem.CheckOutTime);
-            _successMessage = $"Cập nhật giờ chấm công cho nhân viên {_editingItem.EmployeeName} thành công!";
+            _successMessage = $"Cập nhật giờ chấm công ngày {_editingItem.AttendanceDate:dd/MM/yyyy} thành công.";
             _showEditModal = false;
             await FilterDataAsync();
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            _errorMessage = "Lỗi cập nhật: " + ex.Message;
         }
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Đúng giờ" => "badge-active",
+            "Đi muộn" => "badge-inactive",
+            "Về sớm" => "text-warning border-warning",
+            "Đi muộn & Về sớm" => "badge-inactive",
+            _ => "badge-department"
+        };
     }
 
     private void SetDateOnly(Action<DateOnly?> setter, string? val)
     {
         if (DateOnly.TryParse(val, out var d)) setter(d);
-        else if (string.IsNullOrEmpty(val)) setter(null);
+        else setter(null);
     }
 
     private void SetTimeOnly(Action<TimeOnly?> setter, string? val)
     {
         if (TimeOnly.TryParse(val, out var t)) setter(t);
-        else if (string.IsNullOrEmpty(val)) setter(null);
+        else setter(null);
     }
-
-    private string GetStatusBadgeClass(string status) => status switch
-    {
-        "Đủ công" => "bg-success",
-        "Đi muộn" => "bg-danger",
-        "Về sớm" => "bg-warning text-dark",
-        "Đi muộn & Về sớm" => "bg-danger",
-        "Chưa check-out" => "bg-info text-dark",
-        "Vắng mặt" => "bg-secondary",
-        _ => "bg-primary"
-    };
 }
