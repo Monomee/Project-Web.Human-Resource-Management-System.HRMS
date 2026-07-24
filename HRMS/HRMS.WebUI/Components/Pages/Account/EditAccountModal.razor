@@ -15,10 +15,13 @@
                         <DataAnnotationsValidator />
 
                         <div class="row g-3">
-                            <!-- Username -->
+                            <!-- Username (Readonly) -->
                             <div class="col-md-6">
-                                <label class="form-label-dark">Username <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control-dark" @bind="model.Username" placeholder="username" />
+                                <label class="form-label-dark">Username</label>
+                                <input type="text" class="form-control-dark" @bind="model.Username" placeholder="username" disabled readonly />
+                                <small class="text-muted-small">
+                                    <i class="bi bi-info-circle me-1"></i>Username không thể thay đổi
+                                </small>
                             </div>
 
                             <!-- Status -->
@@ -165,6 +168,21 @@
         background: rgba(30, 41, 59, 0.8) !important;
         border-color: rgba(59, 130, 246, 0.5);
         box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15);
+    }
+
+    .form-control-dark:disabled {
+        background: rgba(30, 41, 59, 0.3) !important;
+        border-color: rgba(255, 255, 255, 0.05);
+        color: #94a3b8 !important;
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+
+    .text-muted-small {
+        color: #64748b;
+        font-size: 0.8rem;
+        display: block;
+        margin-top: 0.35rem;
     }
 
     .roles-checkbox-group {

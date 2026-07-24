@@ -31,6 +31,12 @@ public static class AuthorizationHelper
     /// </summary>
     public static bool CanEditAccount(AccountDto currentUser, AccountDto targetAccount)
     {
+        // Special handling for hardcoded admin (Id = -1)
+        if (currentUser.Id == -1)
+        {
+            return targetAccount.Id != -1; // Admin can edit all except itself
+        }
+        
         // Cannot edit yourself
         if (currentUser.Id == targetAccount.Id)
             return false;
@@ -69,6 +75,12 @@ public static class AuthorizationHelper
     /// </summary>
     public static bool CanViewAccount(AccountDto currentUser, AccountDto targetAccount)
     {
+        // Special handling for hardcoded admin (Id = -1)
+        if (currentUser.Id == -1)
+        {
+            return true; // Admin can view all
+        }
+        
         var currentRole = GetHighestRole(currentUser.RoleNames);
 
         // Admin, HRM, HR, Executive can view all
@@ -95,6 +107,12 @@ public static class AuthorizationHelper
         AccountDto currentUser, 
         List<AccountDto> allAccounts)
     {
+        // Special handling for hardcoded admin (Id = -1)
+        if (currentUser.Id == -1)
+        {
+            return allAccounts; // Admin sees all
+        }
+        
         var currentRole = GetHighestRole(currentUser.RoleNames);
 
         // Admin, HRM, HR, Executive: see all
@@ -147,27 +165,99 @@ public static class AuthorizationHelper
     /// </summary>
     public static bool CanCreateAccount(AccountDto currentUser)
     {
+        // Special handling for hardcoded admin (Id = -1)
+        if (currentUser.Id == -1)
+        {
+            return true;
+        }
+        
         var currentRole = GetHighestRole(currentUser.RoleNames);
         return currentRole == "Admin";
     }
 
     /// <summary>
     /// Check if user can delete accounts
-    /// Only Admin can delete accounts
+    /// Admin: Can delete all (except self)
+    /// HRM: Can delete HR, Manager, Executive, Employee (except self)
+    /// HR: Can delete Manager, Executive, Employee (except self)
     /// </summary>
-    public static bool CanDeleteAccount(AccountDto currentUser)
+    public static bool CanDeleteAccount(AccountDto currentUser, AccountDto targetAccount)
     {
+        // Special handling for hardcoded admin (Id = -1)
+        if (currentUser.Id == -1)
+        {
+            return targetAccount.Id != -1; // Admin can delete all except itself
+        }
+        
+        // Cannot delete yourself
+        if (currentUser.Id == targetAccount.Id)
+            return false;
+        
         var currentRole = GetHighestRole(currentUser.RoleNames);
-        return currentRole == "Admin";
+        var targetRole = GetHighestRole(targetAccount.RoleNames);
+        
+        // Admin can delete all (except self)
+        if (currentRole == "Admin")
+            return true;
+        
+        // HRM can delete HR, Manager, Executive, Employee (except self)
+        if (currentRole == "HRM")
+        {
+            return targetRole == "HR" || targetRole == "Manager" || 
+                   targetRole == "Executive" || targetRole == "Employee";
+        }
+        
+        // HR can delete Manager, Executive, Employee (except self)
+        if (currentRole == "HR")
+        {
+            return targetRole == "Manager" || targetRole == "Executive" || 
+                   targetRole == "Employee";
+        }
+        
+        // Others cannot delete
+        return false;
     }
 
     /// <summary>
     /// Check if user can reset passwords
-    /// Only Admin can reset passwords
+    /// Admin: Can reset all (except self)
+    /// HRM: Can reset HR, Manager, Executive, Employee (except self)
+    /// HR: Can reset Manager, Executive, Employee (except self)
     /// </summary>
-    public static bool CanResetPassword(AccountDto currentUser)
+    public static bool CanResetPassword(AccountDto currentUser, AccountDto targetAccount)
     {
+        // Special handling for hardcoded admin (Id = -1)
+        if (currentUser.Id == -1)
+        {
+            return targetAccount.Id != -1; // Admin can reset all except itself
+        }
+        
+        // Cannot reset your own password through admin function
+        if (currentUser.Id == targetAccount.Id)
+            return false;
+        
         var currentRole = GetHighestRole(currentUser.RoleNames);
-        return currentRole == "Admin";
+        var targetRole = GetHighestRole(targetAccount.RoleNames);
+        
+        // Admin can reset all (except self)
+        if (currentRole == "Admin")
+            return true;
+        
+        // HRM can reset HR, Manager, Executive, Employee (except self)
+        if (currentRole == "HRM")
+        {
+            return targetRole == "HR" || targetRole == "Manager" || 
+                   targetRole == "Executive" || targetRole == "Employee";
+        }
+        
+        // HR can reset Manager, Executive, Employee (except self)
+        if (currentRole == "HR")
+        {
+            return targetRole == "Manager" || targetRole == "Executive" || 
+                   targetRole == "Employee";
+        }
+        
+        // Others cannot reset
+        return false;
     }
 }

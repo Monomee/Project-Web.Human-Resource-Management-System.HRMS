@@ -138,13 +138,13 @@
                                                 <i class="bi bi-pencil-fill"></i>
                                             </button>
                                         }
-                                        @if (currentUserAccount != null && AuthorizationHelper.CanResetPassword(currentUserAccount))
+                                        @if (currentUserAccount != null && AuthorizationHelper.CanResetPassword(currentUserAccount, acc))
                                         {
                                             <button class="btn btn-sm btn-warning me-1" @onclick="() => ShowResetPasswordConfirmation(acc.Id)" title="Reset mật khẩu">
                                                 <i class="bi bi-arrow-clockwise"></i>
                                             </button>
                                         }
-                                        @if (currentUserAccount != null && AuthorizationHelper.CanDeleteAccount(currentUserAccount))
+                                        @if (currentUserAccount != null && AuthorizationHelper.CanDeleteAccount(currentUserAccount, acc))
                                         {
                                             <button class="btn btn-sm btn-danger" @onclick="() => ShowDeleteConfirmation(acc.Id)" title="Xóa">
                                                 <i class="bi bi-trash-fill"></i>
@@ -152,8 +152,8 @@
                                         }
                                         @if (currentUserAccount == null || 
                                             (!AuthorizationHelper.CanEditAccount(currentUserAccount, acc) && 
-                                             !AuthorizationHelper.CanResetPassword(currentUserAccount) && 
-                                             !AuthorizationHelper.CanDeleteAccount(currentUserAccount)))
+                                             !AuthorizationHelper.CanResetPassword(currentUserAccount, acc) && 
+                                             !AuthorizationHelper.CanDeleteAccount(currentUserAccount, acc)))
                                         {
                                             <span class="text-muted" style="font-size: 0.85rem;">
                                                 <i class="bi bi-eye-slash me-1"></i>Chỉ xem
@@ -330,8 +330,31 @@
                 if (accountIdClaim != null && int.TryParse(accountIdClaim.Value, out int accId))
                 {
                     currentAccountId = accId;
-                    // Load current user's account details
-                    currentUserAccount = await AccountService.GetByIdAsync(accId);
+                    
+                    // Special handling for hardcoded admin account (Id = -1)
+                    if (accId == -1)
+                    {
+                        // Create fake AccountDto for admin
+                        var fullNameClaim = user.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Name);
+                        currentUserAccount = new AccountDto
+                        {
+                            Id = -1,
+                            Username = "admin",
+                            Status = true,
+                            UserId = -1,
+                            EmployeeCode = "ADMIN",
+                            FullName = fullNameClaim?.Value ?? "System Administrator",
+                            EmailCompany = "admin@system.local",
+                            DepartmentId = -1,
+                            RoleIds = new List<int>(),
+                            RoleNames = new List<string> { "Admin" }
+                        };
+                    }
+                    else
+                    {
+                        // Load current user's account details from database
+                        currentUserAccount = await AccountService.GetByIdAsync(accId);
+                    }
                 }
                 
                 // Get Role
