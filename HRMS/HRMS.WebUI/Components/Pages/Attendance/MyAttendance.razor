@@ -7,7 +7,7 @@
 @using System.Security.Claims
 
 @inject IAttendanceService AttendanceService
-@inject IApplicationDbContext DbContext
+@inject IAccountService AccountService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Điểm danh cá nhân — HRMS</PageTitle>
@@ -304,7 +304,8 @@
                 }
                 else
                 {
-                    var userEntity = DbContext.Accounts.FirstOrDefault(a => a.Username == user.Identity.Name);
+                    var accounts = await AccountService.GetAllAsync();
+                    var userEntity = accounts.FirstOrDefault(a => a.Username == user.Identity.Name);
                     if (userEntity != null) _currentUserId = userEntity.UserId;
                 }
             }

@@ -9,7 +9,8 @@
 
 @attribute [Authorize(Roles = "Admin,HRM,HR")]
 @inject IAttendanceService AttendanceService
-@inject IApplicationDbContext DbContext
+@inject IAccountService AccountService
+@inject IEmployeeService EmployeeService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Quản lý Ca & Phân ca — HRMS</PageTitle>
@@ -489,7 +490,8 @@
             var user = authState.User;
             if (user.Identity?.IsAuthenticated == true)
             {
-                var userEntity = DbContext.Accounts.FirstOrDefault(a => a.Username == user.Identity.Name);
+                var accounts = await AccountService.GetAllAsync();
+                var userEntity = accounts.FirstOrDefault(a => a.Username == user.Identity.Name);
                 if (userEntity != null) _currentAccountId = userEntity.Id;
             }
         }
@@ -509,11 +511,10 @@
             _shifts = await AttendanceService.GetShiftsAsync();
             _assignments = await AttendanceService.GetShiftAssignmentsAsync();
 
-            _employees = DbContext.Users
+            var allEmployees = await EmployeeService.GetEmployeesWithDetailsAsync();
+            _employees = allEmployees
                 .Where(u => u.Status)
-                .Select(u => new { u.Id, u.EmployeeCode, u.FullName, DeptName = u.Department.Name })
-                .ToList()
-                .Select(u => (u.Id, u.EmployeeCode, u.FullName, u.DeptName))
+                .Select(u => (u.Id, u.EmployeeCode, u.FullName, u.DepartmentName))
                 .ToList();
         }
         catch (Exception ex)

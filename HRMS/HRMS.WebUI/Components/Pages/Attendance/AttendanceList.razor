@@ -9,7 +9,7 @@
 
 @attribute [Authorize(Roles = "Admin,HRM,HR,Manager")]
 @inject IAttendanceService AttendanceService
-@inject IApplicationDbContext DbContext
+@inject IDepartmentService DepartmentService
 
 <PageTitle>Quản lý Chấm công — HRMS</PageTitle>
 
@@ -322,11 +322,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _departments = DbContext.Departments
-            .Select(d => new { d.Id, d.Name })
-            .ToList()
-            .Select(d => (d.Id, d.Name))
-            .ToList();
+        var depts = await DepartmentService.GetAllAsync();
+        _departments = depts.Select(d => (d.Id, d.Name)).ToList();
 
         _periods = await AttendanceService.GetPeriodsAsync();
 

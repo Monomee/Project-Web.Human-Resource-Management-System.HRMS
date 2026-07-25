@@ -16,83 +16,110 @@ public static class AttendanceCalculator
 {
     public static AttendanceCalculationResult Calculate(TimeOnly? checkIn, TimeOnly? checkOut, Shift shift)
     {
-        var result = new AttendanceCalculationResult();
-
         if (checkIn == null)
         {
-            result.Status = "Vắng mặt";
-            return result;
+            return new AttendanceCalculationResult { Status = "Vắng mặt" };
         }
 
-        // 1. Tính Late Minutes
-        var allowedCheckIn = shift.StartTime.AddMinutes(shift.LateToleranceMinute);
-        if (checkIn.Value > allowedCheckIn)
-        {
-            result.LateMinutes = (int)Math.Max(0, (checkIn.Value - shift.StartTime).TotalMinutes);
-        }
+        int lateMinutes = CalculateLateMinutes(checkIn.Value, shift);
 
-        // Nếu chưa Check Out
         if (checkOut == null)
         {
-            result.Status = result.LateMinutes > 0 ? "Đi muộn (Chưa ra)" : "Chưa check-out";
-            return result;
-        }
-
-        // 2. Tính Early Leave Minutes
-        if (checkOut.Value < shift.EndTime)
-        {
-            result.EarlyLeaveMinutes = (int)Math.Max(0, (shift.EndTime - checkOut.Value).TotalMinutes);
-        }
-
-        // 3. Tính Overtime Minutes
-        var allowedCheckOut = shift.EndTime.AddMinutes(shift.LateCheckOutMinute);
-        if (checkOut.Value > allowedCheckOut)
-        {
-            result.OvertimeMinutes = (int)Math.Max(0, (checkOut.Value - shift.EndTime).TotalMinutes);
-        }
-
-        // 4. Tính Working Minutes
-        var actualStart = checkIn.Value < shift.StartTime ? shift.StartTime : checkIn.Value;
-        var actualEnd = checkOut.Value > shift.EndTime ? shift.EndTime : checkOut.Value;
-
-        if (actualEnd > actualStart)
-        {
-            int totalWorkMins = (int)(actualEnd - actualStart).TotalMinutes;
-
-            // Trừ thời gian nghỉ trưa nếu làm việc vắt qua khoảng nghỉ
-            var breakStart = shift.BreakStart;
-            var breakEnd = shift.BreakEnd;
-            if (actualStart < breakEnd && actualEnd > breakStart)
+            return new AttendanceCalculationResult
             {
-                var overlapStart = actualStart > breakStart ? actualStart : breakStart;
-                var overlapEnd = actualEnd < breakEnd ? actualEnd : breakEnd;
-                if (overlapEnd > overlapStart)
-                {
-                    int breakMins = (int)(overlapEnd - overlapStart).TotalMinutes;
-                    totalWorkMins = Math.Max(0, totalWorkMins - breakMins);
-                }
+                LateMinutes = lateMinutes,
+                Status = lateMinutes > 0 ? "Đi muộn (Chưa ra)" : "Chưa check-out"
+            };
+        }
+
+        int earlyLeaveMinutes = CalculateEarlyLeaveMinutes(checkOut.Value, shift);
+        int overtimeMinutes = CalculateOvertimeMinutes(checkOut.Value, shift);
+        int workingMinutes = CalculateWorkingMinutes(checkIn.Value, checkOut.Value, shift);
+        string status = DetermineStatus(lateMinutes, earlyLeaveMinutes);
+
+        return new AttendanceCalculationResult
+        {
+            WorkingMinutes = workingMinutes,
+            LateMinutes = lateMinutes,
+            EarlyLeaveMinutes = earlyLeaveMinutes,
+            OvertimeMinutes = overtimeMinutes,
+            Status = status
+        };
+    }
+
+    private static int CalculateLateMinutes(TimeOnly checkIn, Shift shift)
+    {
+        var allowedCheckIn = shift.StartTime.AddMinutes(shift.LateToleranceMinute);
+        if (checkIn > allowedCheckIn)
+        {
+            return (int)Math.Max(0, (checkIn - shift.StartTime).TotalMinutes);
+        }
+        return 0;
+    }
+
+    private static int CalculateEarlyLeaveMinutes(TimeOnly checkOut, Shift shift)
+    {
+        if (checkOut < shift.EndTime)
+        {
+            return (int)Math.Max(0, (shift.EndTime - checkOut).TotalMinutes);
+        }
+        return 0;
+    }
+
+    private static int CalculateOvertimeMinutes(TimeOnly checkOut, Shift shift)
+    {
+        var allowedCheckOut = shift.EndTime.AddMinutes(shift.LateCheckOutMinute);
+        if (checkOut > allowedCheckOut)
+        {
+            return (int)Math.Max(0, (checkOut - shift.EndTime).TotalMinutes);
+        }
+        return 0;
+    }
+
+    private static int CalculateWorkingMinutes(TimeOnly checkIn, TimeOnly checkOut, Shift shift)
+    {
+        var actualStart = checkIn < shift.StartTime ? shift.StartTime : checkIn;
+        var actualEnd = checkOut > shift.EndTime ? shift.EndTime : checkOut;
+
+        if (actualEnd <= actualStart)
+        {
+            return 0;
+        }
+
+        int totalWorkMins = (int)(actualEnd - actualStart).TotalMinutes;
+        int breakMins = CalculateBreakOverlapMinutes(actualStart, actualEnd, shift.BreakStart, shift.BreakEnd);
+
+        return Math.Max(0, totalWorkMins - breakMins);
+    }
+
+    private static int CalculateBreakOverlapMinutes(TimeOnly actualStart, TimeOnly actualEnd, TimeOnly breakStart, TimeOnly breakEnd)
+    {
+        if (actualStart < breakEnd && actualEnd > breakStart)
+        {
+            var overlapStart = actualStart > breakStart ? actualStart : breakStart;
+            var overlapEnd = actualEnd < breakEnd ? actualEnd : breakEnd;
+            if (overlapEnd > overlapStart)
+            {
+                return (int)(overlapEnd - overlapStart).TotalMinutes;
             }
-            result.WorkingMinutes = totalWorkMins;
         }
+        return 0;
+    }
 
-        // 5. Xác định Trạng thái công
-        if (result.LateMinutes > 0 && result.EarlyLeaveMinutes > 0)
+    private static string DetermineStatus(int lateMinutes, int earlyLeaveMinutes)
+    {
+        if (lateMinutes > 0 && earlyLeaveMinutes > 0)
         {
-            result.Status = "Đi muộn & Về sớm";
+            return "Đi muộn & Về sớm";
         }
-        else if (result.LateMinutes > 0)
+        if (lateMinutes > 0)
         {
-            result.Status = "Đi muộn";
+            return "Đi muộn";
         }
-        else if (result.EarlyLeaveMinutes > 0)
+        if (earlyLeaveMinutes > 0)
         {
-            result.Status = "Về sớm";
+            return "Về sớm";
         }
-        else
-        {
-            result.Status = "Đủ công";
-        }
-
-        return result;
+        return "Đủ công";
     }
 }
