@@ -31,6 +31,7 @@ public class AuthService : IAuthService
             };
         }
 
+        
         var adminUsername = _configuration["AdminAccount:Username"];
         var adminPassword = _configuration["AdminAccount:Password"];
         var adminFullName = _configuration["AdminAccount:FullName"] ?? "System Administrator";
@@ -40,6 +41,7 @@ public class AuthService : IAuthService
             username == adminUsername && 
             password == adminPassword)
         {
+            // Admin login successful
             return new AuthResult
             {
                 Success = true,
@@ -49,6 +51,7 @@ public class AuthService : IAuthService
             };
         }
 
+        
         var account = await _dbContext.Accounts
             .Include(a => a.User)
             .Include(a => a.Roles)
@@ -63,6 +66,7 @@ public class AuthService : IAuthService
             };
         }
 
+       
         if (!account.Status)
         {
             return new AuthResult
@@ -72,6 +76,7 @@ public class AuthService : IAuthService
             };
         }
 
+   
         bool isPasswordValid = false;
         try
         {
@@ -79,6 +84,7 @@ public class AuthService : IAuthService
         }
         catch (Exception)
         {
+        
             isPasswordValid = false;
         }
 
@@ -91,8 +97,10 @@ public class AuthService : IAuthService
             };
         }
 
+       
         var roles = account.Roles.Select(r => r.Name).ToList();
 
+        // Trả về kết quả
         return new AuthResult
         {
             Success = true,
@@ -110,6 +118,7 @@ public class AuthService : IAuthService
         var account = await _dbContext.Accounts.FindAsync(accountId);
         if (account == null)
             return false;
+
 
         bool isPasswordValid = false;
         try

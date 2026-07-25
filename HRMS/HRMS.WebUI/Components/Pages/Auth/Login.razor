@@ -345,6 +345,7 @@
 
         try
         {
+            
             var authResult = await AuthService.LoginAsync(_loginInput.Username, _loginInput.Password);
 
             if (!authResult.Success)
@@ -354,13 +355,15 @@
                 return;
             }
 
+            
             var claims = new List<Claim>
             {
-                new Claim("AccountId", authResult.AccountId.ToString()), 
+                new Claim("AccountId", authResult.AccountId.ToString()), // For self-edit detection
                 new Claim(ClaimTypes.NameIdentifier, authResult.AccountId.ToString()),
                 new Claim(ClaimTypes.Name, authResult.FullName)
             };
 
+            
             foreach (var role in authResult.Roles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role));
@@ -369,8 +372,10 @@
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             var principal = new ClaimsPrincipal(identity);
 
+            
             var tempToken = TokenStore.GenerateToken(principal);
 
+            
             NavigationManager.NavigateTo($"/auth/signin?token={tempToken}", forceLoad: true);
         }
         catch (Exception ex)
