@@ -20,7 +20,6 @@ public class PayrollService : IPayrollService
 
     public async Task<bool> CalculateMonthlyPayrollAsync(int periodId)
     {
-        // Kiểm tra kỳ công
         var period = await _db.TimesheetPeriods.FirstOrDefaultAsync(p => p.Id == periodId);
         if (period == null)
         {
@@ -32,24 +31,20 @@ public class PayrollService : IPayrollService
             throw new InvalidOperationException("Kỳ công này chưa được khóa sổ! Vui lòng khóa kỳ công trước khi tính lương.");
         }
 
-        // Lấy danh sách nhân viên đang hoạt động
         var users = await _db.Users.Where(u => u.Status).ToListAsync();
         if (!users.Any())
         {
             return true;
         }
 
-        // Lấy hợp đồng lao động "Active" của các nhân viên
         var activeContracts = await _db.EmploymentContracts
             .Where(c => c.Status == "Active")
             .ToDictionaryAsync(c => c.UserId);
 
-        // Lấy dữ liệu điểm danh trong kỳ
         var attendances = await _db.Attendances
             .Where(a => a.PeriodId == periodId && a.CheckInTime != null)
             .ToListAsync();
 
-        // Gom nhóm đếm số ngày công thực tế (D_actual) của mỗi nhân viên
         var attendanceDaysDict = attendances
             .GroupBy(a => a.EmployeeId)
             .ToDictionary(
@@ -57,7 +52,6 @@ public class PayrollService : IPayrollService
                 g => g.Select(a => a.AttendanceDate).Distinct().Count()
             );
 
-        // Lấy đơn từ được phê duyệt trong khoảng thời gian kỳ công
         var periodStart = period.StartDate.ToDateTime(TimeOnly.MinValue);
         var periodEnd = period.EndDate.ToDateTime(TimeOnly.MaxValue);
 
@@ -67,7 +61,6 @@ public class PayrollService : IPayrollService
             .Where(r => r.Status == "Approved" && r.StartDate >= periodStart && r.EndDate <= periodEnd)
             .ToListAsync();
 
-        // Tính ngày nghỉ phép (D_leave_paid) được duyệt cho mỗi nhân viên
         var leaveDaysDict = approvedRequests
             .Where(r => r.RequestType.Code == "LEAVE")
             .GroupBy(r => r.CreatedByAccount.UserId)
@@ -76,7 +69,6 @@ public class PayrollService : IPayrollService
                 g => g.Sum(r => r.Value)
             );
 
-        // Tính giờ OT (H_ot) được duyệt cho mỗi nhân viên
         var otHoursDict = approvedRequests
             .Where(r => r.RequestType.Code == "OT")
             .GroupBy(r => r.CreatedByAccount.UserId)
@@ -85,7 +77,6 @@ public class PayrollService : IPayrollService
                 g => g.Sum(r => r.Value)
             );
 
-        // Tính số ngày công chuẩn hành chính (loại trừ các ngày Chủ nhật) trong khoảng thời gian của kỳ công
         int standardWorkingDays = 0;
         for (var date = period.StartDate; date <= period.EndDate; date = date.AddDays(1))
         {
@@ -100,21 +91,17 @@ public class PayrollService : IPayrollService
 
         foreach (var user in users)
         {
-            // Lấy lương cơ bản
             decimal baseSalary = 0m;
             if (activeContracts.TryGetValue(user.Id, out var contract))
             {
                 baseSalary = contract.BaseSalary;
             }
 
-            // Lấy ngày công thực tế
             attendanceDaysDict.TryGetValue(user.Id, out int dActualInt);
             decimal dActual = (decimal)dActualInt;
 
-            // Lấy ngày nghỉ phép hưởng lương
             leaveDaysDict.TryGetValue(user.Id, out decimal dLeavePaid);
 
-            // Lấy giờ OT
             otHoursDict.TryGetValue(user.Id, out decimal hOt);
 
             // Đơn giá ngày công = BaseSalary / StandardWorkingDays
@@ -180,7 +167,6 @@ public class PayrollService : IPayrollService
             }
             taxDeduction = Math.Round(taxDeduction, 0, MidpointRounding.AwayFromZero);
 
-            // Lương thực lĩnh (Net) = Gross - Khấu trừ bảo hiểm - Thuế TNCN
             decimal netAmount = grossAmount - insuranceDeduction - taxDeduction;
             if (netAmount < 0m)
             {
@@ -188,7 +174,6 @@ public class PayrollService : IPayrollService
             }
             netAmount = Math.Round(netAmount, 0, MidpointRounding.AwayFromZero);
 
-            // 7. Tạo thực thể Payslip mới
             var payslip = new Payslip
             {
                 UserId = user.Id,
@@ -207,7 +192,6 @@ public class PayrollService : IPayrollService
             payslips.Add(payslip);
         }
 
-        // Bọc toàn bộ thao tác xoá cũ và chèn mới trong Database Transaction để bảo vệ ghi đè song song
         using var transaction = await _db.Database.BeginTransactionAsync();
         try
         {
@@ -248,7 +232,6 @@ public class PayrollService : IPayrollService
             var periodStart = period.StartDate.ToDateTime(TimeOnly.MinValue);
             var periodEnd = period.EndDate.ToDateTime(TimeOnly.MaxValue);
 
-            // Pre-load all attendances for this period to populate in-memory (performance optimization)
             var attendances = await _db.Attendances
                 .Where(a => a.PeriodId == periodId && a.CheckInTime != null)
                 .ToListAsync();
@@ -259,7 +242,6 @@ public class PayrollService : IPayrollService
                     g => g.Select(a => a.AttendanceDate).Distinct().Count()
                 );
 
-            // Pre-load all approved requests for this period
             var approvedRequests = await _db.Requests
                 .Include(r => r.RequestType)
                 .Include(r => r.CreatedByAccount)
@@ -308,14 +290,12 @@ public class PayrollService : IPayrollService
             var periodStart = period.StartDate.ToDateTime(TimeOnly.MinValue);
             var periodEnd = period.EndDate.ToDateTime(TimeOnly.MaxValue);
 
-            // Calculate actual days
             payslip.ActualDays = await _db.Attendances
                 .Where(a => a.EmployeeId == userId && a.PeriodId == periodId && a.CheckInTime != null)
                 .Select(a => a.AttendanceDate)
                 .Distinct()
                 .CountAsync();
 
-            // Calculate leave paid days
             var leaveRequests = await _db.Requests
                 .Where(r => r.CreatedByAccount.UserId == userId
                          && r.RequestType.Code == "LEAVE"
@@ -325,7 +305,6 @@ public class PayrollService : IPayrollService
                 .ToListAsync();
             payslip.LeavePaidDays = leaveRequests.Sum(r => r.Value);
 
-            // Calculate OT hours
             var otRequests = await _db.Requests
                 .Where(r => r.CreatedByAccount.UserId == userId
                          && r.RequestType.Code == "OT"
