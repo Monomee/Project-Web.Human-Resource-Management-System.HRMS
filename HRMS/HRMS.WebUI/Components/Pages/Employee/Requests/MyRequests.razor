@@ -1,177 +1,185 @@
 @page "/requests/my"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
-@rendermode InteractiveServer
-
 @using System.Security.Claims
+@using Microsoft.JSInterop
 @using HRMS.Application.DTOs
 @using HRMS.Application.Interfaces
 @using HRMS.Domain.Entities
-@using Microsoft.AspNetCore.SignalR.Client
-
+@using Microsoft.AspNetCore.SignalR.Client;
 @inject IRequestService RequestService
 @inject NavigationManager NavManager
 @inject AuthenticationStateProvider AuthStateProvider
-@inject HRMS.WebUI.Services.TempTokenStore TokenStore
+@inject IJSRuntime JS
 @implements IAsyncDisposable
 
-<PageTitle>Đơn của tôi — HRMS</PageTitle>
+<PageTitle>Đơn của tôi</PageTitle>
 
-<div class="my-requests-page animate-fade-in">
-    @* Page Header *@
-    <div class="page-header mb-4">
-        <div class="page-header-icon"><i class="bi bi-file-earmark-plus fs-3"></i></div>
-        <div>
-            <h1 class="page-title text-white">Đơn từ của tôi</h1>
-            <p class="page-subtitle text-muted-light">Tạo và theo dõi các đơn xin nghỉ phép, làm thêm giờ hoặc khiếu nại công.</p>
-        </div>
+<h3>Đơn từ của tôi</h3>
+
+@if (!_accountResolved)
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+else
+{
+
+    <div class="card p-3 mb-4">
+        <h5>@(_editingRequestId is null ? "Tạo đơn mới" : $"Sửa đơn nháp #{_editingRequestId}")</h5>
+
+        @if (_requestTypes is null)
+        {
+            <p>Đang tải danh sách loại đơn...</p>
+        }
+        else
+        {
+            <EditForm Model="_newRequest">
+                <div class="mb-2">
+                    <label>Loại đơn</label>
+                    <InputSelect class="form-select" @bind-Value="_newRequest.RequestTypeId">
+                        <option value="0">-- Chọn loại đơn --</option>
+                        @foreach (var t in _requestTypes)
+                        {
+                            <option value="@t.Id">@t.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                @if (SelectedTypeCode == RequestTypeCodes.Leave)
+                {
+                    <div class="row mb-2">
+                        <div class="col">
+                            <label>Từ ngày</label>
+                            <InputDate class="form-control" @bind-Value="_leaveStart" />
+                        </div>
+                        <div class="col">
+                            <label>Đến ngày</label>
+                            <InputDate class="form-control" @bind-Value="_leaveEnd" />
+                        </div>
+                    </div>
+                }
+                else if (SelectedTypeCode == RequestTypeCodes.Overtime)
+                {
+                    <div class="row mb-2">
+                        <div class="col">
+                            <label>Ngày làm OT</label>
+                            <InputDate class="form-control" @bind-Value="_otDate" />
+                        </div>
+                        <div class="col">
+                            <label>Số giờ OT</label>
+                            <InputNumber class="form-control" @bind-Value="_newRequest.OvertimeHours" />
+                        </div>
+                    </div>
+                }
+                else if (SelectedTypeCode == RequestTypeCodes.Complaint)
+                {
+                    <div class="row mb-2">
+                        <div class="col">
+                            <label>Ngày công cần khiếu nại</label>
+                            <InputDate class="form-control" @bind-Value="_complaintDate" />
+                        </div>
+                        <div class="col">
+                            <label>Số giờ đề nghị</label>
+                            <InputNumber class="form-control" @bind-Value="_newRequest.ComplaintProposedHours" />
+                        </div>
+                    </div>
+                }
+
+                <div class="mb-2">
+                    <label>Lý do / Ghi chú</label>
+                    <InputTextArea class="form-control" @bind-Value="_newRequest.Reason" />
+                </div>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="alert alert-danger">@_errorMessage</div>
+                }
+
+                @if (_editingRequestId is null)
+                {
+                    <button type="button" class="btn btn-outline-secondary me-2" disabled="@_isSubmitting" @onclick="() => HandleSubmit(false)">
+                        Lưu nháp
+                    </button>
+                    <button type="button" class="btn btn-primary" disabled="@_isSubmitting" @onclick="() => HandleSubmit(true)">
+                        @(_isSubmitting ? "Đang gửi..." : "Gửi đơn")
+                    </button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-primary me-2" disabled="@_isSubmitting" @onclick="SaveDraftEdit">
+                        @(_isSubmitting ? "Đang lưu..." : "Lưu thay đổi")
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@_isSubmitting" @onclick="CancelEdit">
+                        Huỷ sửa
+                    </button>
+                }
+            </EditForm>
+        }
     </div>
 
-    @if (!_accountResolved)
+    <h5>Lịch sử đơn</h5>
+
+    @if (_myRequests is null)
     {
-        <div class="alert alert-danger-custom mb-4">@_errorMessage</div>
+        <p>Đang tải...</p>
+    }
+    else if (_myRequests.Count == 0)
+    {
+        <p class="text-muted">Chưa có đơn nào.</p>
     }
     else
     {
-        @* Form Section *@
-        <div class="card-dark-custom mb-5 shadow-sm">
-            <div class="section-header-dark py-3 px-4">
-                <h5 class="section-title m-0"><i class="bi bi-pencil-square me-2 text-primary"></i>Tạo đơn mới</h5>
-            </div>
-            <div class="card-body-dark p-4">
-                @if (_requestTypes is null)
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Loại đơn</th>
+                    <th>Nội dung</th>
+                    <th>Trạng thái</th>
+                    <th>Ngày tạo</th>
+                    <th>Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in _myRequests)
                 {
-                    <p class="text-muted">Đang tải danh sách loại đơn...</p>
+                    <tr>
+                        <td>@r.RequestTypeName</td>
+                        <td>@r.Summary</td>
+                        <td><span class="badge @GetStatusBadgeClass(r.Status)">@GetStatusLabel(r.Status)</span></td>
+                        <td>@r.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>
+                            @if (r.Status == RequestStatuses.Draft)
+                            {
+                                <button class="btn btn-sm btn-outline-secondary me-1"
+                                        disabled="@_cancellingIds.Contains(r.Id)"
+                                        @onclick="() => StartEdit(r)">
+                                    Sửa
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary me-1"
+                                        disabled="@_cancellingIds.Contains(r.Id)"
+                                        @onclick="() => SubmitDraft(r.Id)">
+                                    Gửi đơn
+                                </button>
+                            }
+                            @if (r.Status == RequestStatuses.Draft || r.Status == RequestStatuses.Pending)
+                            {
+                                <button class="btn btn-sm btn-outline-danger"
+                                        disabled="@_cancellingIds.Contains(r.Id)"
+                                        @onclick="() => CancelRequest(r.Id)">
+                                    Huỷ đơn
+                                </button>
+                            }
+                        </td>
+                    </tr>
                 }
-                else
-                {
-                    <EditForm Model="_newRequest" OnValidSubmit="HandleSubmit">
-                        <DataAnnotationsValidator />
-
-                        <div class="mb-3">
-                            <label class="form-label-custom mb-2 d-block">Loại đơn</label>
-                            <InputSelect class="form-select-custom" @bind-Value="_newRequest.RequestTypeId">
-                                <option value="0">-- Chọn loại đơn --</option>
-                                @foreach (var t in _requestTypes)
-                                {
-                                    <option value="@t.Id">@t.Name</option>
-                                }
-                            </InputSelect>
-                        </div>
-
-                        @if (SelectedTypeCode == RequestTypeCodes.Leave)
-                        {
-                            <div class="row g-3 mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label-custom mb-2 d-block">Từ ngày</label>
-                                    <InputDate class="form-control-custom" @bind-Value="_leaveStart" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label-custom mb-2 d-block">Đến ngày</label>
-                                    <InputDate class="form-control-custom" @bind-Value="_leaveEnd" />
-                                </div>
-                            </div>
-                        }
-                        else if (SelectedTypeCode == RequestTypeCodes.Overtime)
-                        {
-                            <div class="row g-3 mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label-custom mb-2 d-block">Ngày làm OT</label>
-                                    <InputDate class="form-control-custom" @bind-Value="_otDate" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label-custom mb-2 d-block">Số giờ OT</label>
-                                    <InputNumber class="form-control-custom" @bind-Value="_newRequest.OvertimeHours" />
-                                </div>
-                            </div>
-                        }
-                        else if (SelectedTypeCode == RequestTypeCodes.Complaint)
-                        {
-                            <div class="row g-3 mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label-custom mb-2 d-block">Ngày công cần khiếu nại</label>
-                                    <InputDate class="form-control-custom" @bind-Value="_complaintDate" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label-custom mb-2 d-block">Số giờ đề nghị</label>
-                                    <InputNumber class="form-control-custom" @bind-Value="_newRequest.ComplaintProposedHours" />
-                                </div>
-                            </div>
-                        }
-
-                        <div class="mb-4">
-                            <label class="form-label-custom mb-2 d-block">Lý do / Ghi chú</label>
-                            <InputTextArea class="form-control-custom" rows="3" placeholder="Nhập lý do chi tiết..." @bind-Value="_newRequest.Reason" />
-                        </div>
-
-                        @if (!string.IsNullOrEmpty(_errorMessage))
-                        {
-                            <div class="alert alert-danger-custom mb-3">@_errorMessage</div>
-                        }
-
-                        <button type="submit" class="btn-primary-custom" disabled="@_isSubmitting">
-                            @(_isSubmitting ? "Đang gửi..." : "Gửi đơn")
-                        </button>
-                    </EditForm>
-                }
-            </div>
-        </div>
-
-        @* Table Section *@
-        <div class="card-dark-custom shadow-sm">
-            <div class="section-header-dark py-3 px-4">
-                <h5 class="section-title m-0"><i class="bi bi-clock-history me-2 text-primary"></i>Lịch sử đơn từ</h5>
-            </div>
-            <div class="card-body-dark p-0">
-                @if (_myRequests is null)
-                {
-                    <div class="text-center py-5">
-                        <div class="spinner-border text-primary" role="status"></div>
-                        <p class="text-muted mt-2">Đang tải lịch sử đơn...</p>
-                    </div>
-                }
-                else if (_myRequests.Count == 0)
-                {
-                    <div class="text-center py-5 text-muted-dark">
-                        <div class="fs-1 mb-3"><i class="bi bi-inbox-fill"></i></div>
-                        <p>Chưa có đơn nào được tạo.</p>
-                    </div>
-                }
-                else
-                {
-                    <div class="table-responsive">
-                        <table class="table-custom">
-                            <thead>
-                                <tr>
-                                    <th>Loại đơn</th>
-                                    <th>Nội dung</th>
-                                    <th class="text-center">Trạng thái</th>
-                                    <th>Ngày tạo</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var r in _myRequests)
-                                {
-                                    <tr>
-                                        <td class="fw-semibold text-white">@r.RequestTypeName</td>
-                                        <td>@r.Summary</td>
-                                        <td class="text-center">
-                                            <span class="badge-status @GetStatusBadgeClass(r.Status)">
-                                                @GetStatusLabel(r.Status)
-                                            </span>
-                                        </td>
-                                        <td class="text-muted-light" style="font-family: monospace; font-size: 0.85rem;">
-                                            @r.CreatedAt.ToString("dd/MM/yyyy HH:mm")
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-            </div>
-        </div>
+            </tbody>
+        </table>
     }
-</div>
+
+    @if (!string.IsNullOrEmpty(_cancelErrorMessage) && _myRequests is not null)
+    {
+        <div class="alert alert-danger mt-2">@_cancelErrorMessage</div>
+    }
+}
 
 @code {
     private int AccountId;
@@ -187,6 +195,9 @@
     private List<RequestListItemDto>? _myRequests;
     private string? _errorMessage;
     private bool _isSubmitting;
+    private readonly HashSet<int> _cancellingIds = new();
+    private string? _cancelErrorMessage;
+    private int? _editingRequestId;
 
     private Microsoft.AspNetCore.SignalR.Client.HubConnection? _hubConnection;
 
@@ -210,10 +221,8 @@
         _requestTypes = await RequestService.GetRequestTypesAsync();
         await LoadRequestsAsync();
 
-        var tempToken = TokenStore.GenerateToken(authState.User);
-
         _hubConnection = new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder()
-            .WithUrl(NavManager.ToAbsoluteUri($"/hubs/requests?token={tempToken}"))
+            .WithUrl(NavManager.ToAbsoluteUri("/hubs/requests"))
             .WithAutomaticReconnect()
             .Build();
 
@@ -227,7 +236,7 @@
         });
 
         await _hubConnection.StartAsync();
-        await _hubConnection.SendAsync("JoinEmployeeGroup");
+        await _hubConnection.SendAsync("JoinEmployeeGroup", AccountId);
     }
 
     private async Task LoadRequestsAsync()
@@ -235,7 +244,7 @@
         _myRequests = await RequestService.GetMyRequestsAsync(AccountId);
     }
 
-    private async Task HandleSubmit()
+    private async Task HandleSubmit(bool submitImmediately)
     {
         _errorMessage = null;
         _isSubmitting = true;
@@ -246,7 +255,7 @@
             _newRequest.LeaveEndDate = _leaveEnd;
             _newRequest.OvertimeDate = _otDate;
             _newRequest.ComplaintWorkDate = _complaintDate;
-            _newRequest.SubmitImmediately = true;
+            _newRequest.SubmitImmediately = submitImmediately;
 
             await RequestService.SubmitRequestAsync(_newRequest);
             _newRequest = new RequestDto();
@@ -263,24 +272,140 @@
         }
     }
 
-    private static string GetStatusLabel(string status) => status.ToUpperInvariant() switch
+    /// <summary>Nạp dữ liệu 1 đơn Draft vào form để sửa.</summary>
+    private void StartEdit(RequestListItemDto r)
     {
-        "DRAFT" => "Bản nháp",
-        "PENDING" => "Chờ phê duyệt",
-        "APPROVED" => "Đã phê duyệt",
-        "REJECTED" => "Đã từ chối",
-        "CANCELLED" => "Đã hủy",
+        _errorMessage = null;
+        _editingRequestId = r.Id;
+
+        _newRequest = new RequestDto
+        {
+            AccountId = AccountId,
+            RequestTypeId = r.RequestTypeId,
+            Title = r.Title,
+            Reason = r.Reason,
+            SubmitImmediately = false
+        };
+
+        _leaveStart = _leaveEnd = _otDate = _complaintDate = null;
+
+        switch (r.RequestTypeCode.ToUpperInvariant())
+        {
+            case RequestTypeCodes.Leave:
+                _leaveStart = DateOnly.FromDateTime(r.StartDate);
+                _leaveEnd = DateOnly.FromDateTime(r.EndDate);
+                break;
+
+            case RequestTypeCodes.Overtime:
+                _otDate = DateOnly.FromDateTime(r.StartDate);
+                _newRequest.OvertimeHours = r.Value;
+                break;
+
+            case RequestTypeCodes.Complaint:
+                _complaintDate = DateOnly.FromDateTime(r.StartDate);
+                _newRequest.ComplaintProposedHours = r.Value;
+                break;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        _editingRequestId = null;
+        _errorMessage = null;
+        _newRequest = new RequestDto();
+        _leaveStart = _leaveEnd = _otDate = _complaintDate = null;
+    }
+
+    private async Task SaveDraftEdit()
+    {
+        if (_editingRequestId is null) return;
+
+        _errorMessage = null;
+        _isSubmitting = true;
+        try
+        {
+            _newRequest.AccountId = AccountId;
+            _newRequest.LeaveStartDate = _leaveStart;
+            _newRequest.LeaveEndDate = _leaveEnd;
+            _newRequest.OvertimeDate = _otDate;
+            _newRequest.ComplaintWorkDate = _complaintDate;
+
+            await RequestService.UpdateDraftRequestAsync(_editingRequestId.Value, _newRequest);
+
+            _editingRequestId = null;
+            _newRequest = new RequestDto();
+            _leaveStart = _leaveEnd = _otDate = _complaintDate = null;
+            await LoadRequestsAsync();
+        }
+        catch (Application.RequestWorkflowException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private async Task SubmitDraft(int requestId)
+    {
+        _cancelErrorMessage = null;
+        _cancellingIds.Add(requestId);
+        try
+        {
+            await RequestService.SubmitDraftRequestAsync(requestId, AccountId);
+            await LoadRequestsAsync();
+        }
+        catch (Application.RequestWorkflowException ex)
+        {
+            _cancelErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _cancellingIds.Remove(requestId);
+        }
+    }
+
+    private async Task CancelRequest(int requestId)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "Bạn có chắc chắn muốn huỷ đơn này không? Thao tác này không thể hoàn tác.");
+        if (!confirmed) return;
+
+        _cancelErrorMessage = null;
+        _cancellingIds.Add(requestId);
+        try
+        {
+            await RequestService.CancelRequestAsync(requestId, AccountId);
+            await LoadRequestsAsync();
+        }
+        catch (Application.RequestWorkflowException ex)
+        {
+            _cancelErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _cancellingIds.Remove(requestId);
+        }
+    }
+
+    private static string GetStatusLabel(string status) => status switch
+    {
+        RequestStatuses.Draft => "Nháp",
+        RequestStatuses.Pending => "Chờ duyệt",
+        RequestStatuses.Approved => "Đã duyệt",
+        RequestStatuses.Rejected => "Từ chối",
+        RequestStatuses.Cancelled => "Đã huỷ",
         _ => status
     };
 
-    private static string GetStatusBadgeClass(string status) => status.ToUpperInvariant() switch
+    private static string GetStatusBadgeClass(string status) => status switch
     {
-        "DRAFT" => "badge-status-draft",
-        "PENDING" => "badge-status-pending",
-        "APPROVED" => "badge-status-approved",
-        "REJECTED" => "badge-status-rejected",
-        "CANCELLED" => "badge-status-cancelled",
-        _ => "badge-status-draft"
+        RequestStatuses.Draft => "bg-secondary",
+        RequestStatuses.Pending => "bg-warning text-dark",
+        RequestStatuses.Approved => "bg-success",
+        RequestStatuses.Rejected => "bg-danger",
+        RequestStatuses.Cancelled => "bg-dark",
+        _ => "bg-light text-dark"
     };
 
     public async ValueTask DisposeAsync()

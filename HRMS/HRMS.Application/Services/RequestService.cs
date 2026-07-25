@@ -122,32 +122,12 @@ namespace HRMS.Application.Services
 
             var year = start.Year;
             var balance = await _db.LeaveBalances
-                .FirstOrDefaultAsync(b => b.UserId == userId && b.Year == year);
-            if (balance == null)
-            {
-                balance = new LeaveBalance
-                {
-                    UserId = userId,
-                    Year = year,
-                    TotalDays = 12,
-                    UsedDays = 0,
-                    RemainingDays = 12
-                };
-                _db.LeaveBalances.Add(balance);
-                await _db.SaveChangesAsync();
-            }
+                .FirstOrDefaultAsync(b => b.UserId == userId && b.Year == year)
+                ?? throw new RequestWorkflowException($"Không tìm thấy dữ liệu phép năm {year} cho nhân viên này.");
 
-            var pendingDays = await _db.Requests
-                .Where(r => r.CreatedByAccountId == model.AccountId 
-                            && r.Status == RequestStatuses.Pending 
-                            && r.RequestType.Code == RequestTypeCodes.Leave
-                            && r.StartDate.Year == year)
-                .SumAsync(r => r.Value);
-
-            var availableDays = balance.RemainingDays - pendingDays;
-            if (availableDays < requestedDays)
+            if (balance.RemainingDays < requestedDays)
                 throw new RequestWorkflowException(
-                    $"Không đủ số ngày phép khả dụng. Bạn còn {balance.RemainingDays} ngày phép, nhưng có {pendingDays} ngày đang chờ phê duyệt. Số ngày khả dụng thực tế hiện tại là {availableDays} ngày.");
+                    $"Không đủ số ngày phép còn lại. Còn {balance.RemainingDays} ngày, yêu cầu {requestedDays} ngày.");
 
             return (start.ToDateTime(TimeOnly.MinValue), end.ToDateTime(TimeOnly.MinValue), requestedDays);
         }
@@ -194,10 +174,99 @@ namespace HRMS.Application.Services
             return await _employeeLookup.GetManagerIdAsync(requesterAccountId);
         }
 
+        /// <summary>Gửi 1 đơn đang Draft sang Pending - xác định người duyệt ngay tại thời điểm gửi (không phải lúc lưu nháp).</summary>
+        public async Task SubmitDraftRequestAsync(int requestId, int accountId)
+        {
+            Request entity;
+
+            await using (await _gate.EnterAsync())
+            {
+                entity = await _db.Requests
+                    .Include(r => r.RequestType)
+                    .FirstOrDefaultAsync(r => r.Id == requestId && r.CreatedByAccountId == accountId)
+                    ?? throw new RequestWorkflowException("Không tìm thấy đơn.");
+
+                if (entity.Status != RequestStatuses.Draft)
+                    throw new RequestWorkflowException("Chỉ có thể gửi đơn đang ở trạng thái Nháp (Draft).");
+
+                var code = entity.RequestType?.Code
+                    ?? throw new RequestWorkflowException("Đơn thiếu thông tin loại đơn.");
+
+                entity.Status = RequestStatuses.Pending;
+                entity.CurrentApproverAccountId = await ResolveApproverAsync(code, accountId);
+
+                await _db.SaveChangesAsync();
+            }
+
+            if (entity.CurrentApproverAccountId is not null)
+            {
+                var dto = await ToListItemDtoAsync(entity, entity.RequestType);
+                await _notifier.NotifyNewRequestAsync(dto);
+            }
+        }
+
+        /// <summary>Sửa nội dung 1 đơn đang Draft (cho phép đổi cả loại đơn). Chạy lại đúng validate như lúc tạo mới (VD: kiểm tra phép còn lại), vẫn giữ Status = Draft.</summary>
+        public async Task UpdateDraftRequestAsync(int requestId, RequestDto model)
+        {
+            if (model.AccountId <= 0)
+                throw new RequestWorkflowException("Thiếu thông tin tài khoản.");
+
+            if (model.RequestTypeId <= 0)
+                throw new RequestWorkflowException("Vui lòng chọn loại đơn.");
+
+            await using (await _gate.EnterAsync())
+            {
+                var entity = await _db.Requests
+                    .FirstOrDefaultAsync(r => r.Id == requestId && r.CreatedByAccountId == model.AccountId)
+                    ?? throw new RequestWorkflowException("Không tìm thấy đơn.");
+
+                if (entity.Status != RequestStatuses.Draft)
+                    throw new RequestWorkflowException("Chỉ có thể sửa đơn đang ở trạng thái Nháp (Draft).");
+
+                var requestType = await _db.RequestTypes.FirstOrDefaultAsync(t => t.Id == model.RequestTypeId)
+                    ?? throw new RequestWorkflowException("Loại đơn không hợp lệ.");
+
+                var account = await _db.Accounts.FirstOrDefaultAsync(a => a.Id == model.AccountId)
+                    ?? throw new RequestWorkflowException("Không tìm thấy tài khoản.");
+
+                DateTime startDate;
+                DateTime endDate;
+                decimal value;
+
+                switch (requestType.Code.ToUpperInvariant())
+                {
+                    case RequestTypeCodes.Leave:
+                        (startDate, endDate, value) = await ResolveLeaveAsync(model, account.UserId);
+                        break;
+
+                    case RequestTypeCodes.Overtime:
+                        (startDate, endDate, value) = ResolveOvertime(model);
+                        break;
+
+                    case RequestTypeCodes.Complaint:
+                        (startDate, endDate, value) = ResolveComplaint(model);
+                        break;
+
+                    default:
+                        throw new RequestWorkflowException(
+                            $"Loại đơn '{requestType.Name}' (Code={requestType.Code}) chưa được hỗ trợ xử lý nghiệp vụ.");
+                }
+
+                entity.Title = string.IsNullOrWhiteSpace(model.Title) ? BuildDefaultTitle(requestType.Code, model) : model.Title!.Trim();
+                entity.Reason = model.Reason;
+                entity.RequestTypeId = requestType.Id;
+                entity.StartDate = startDate;
+                entity.EndDate = endDate;
+                entity.Value = value;
+
+                await _db.SaveChangesAsync();
+            }
+        }
+
         // =====================================================================
         // 2. APPROVE REQUEST
         // =====================================================================
-        public async Task ApproveRequestAsync(int requestId, int approverAccountId, string? note = null)
+        public async Task ApproveRequestAsync(int requestId, int approverAccountId)
         {
             Request entity;
 
@@ -215,6 +284,7 @@ namespace HRMS.Application.Services
                     throw new RequestWorkflowException("Bạn không phải là người được phân công duyệt đơn này.");
 
                 entity.Status = RequestStatuses.Approved;
+                entity.CurrentApproverAccountId = approverAccountId; // ghi lại đúng người THỰC SỰ duyệt (quan trọng khi Giám đốc override)
 
                 var code = entity.RequestType?.Code?.ToUpperInvariant();
 
@@ -225,20 +295,8 @@ namespace HRMS.Application.Services
 
                     var year = entity.StartDate.Year;
                     var balance = await _db.LeaveBalances
-                        .FirstOrDefaultAsync(b => b.UserId == account.UserId && b.Year == year);
-                    if (balance == null)
-                    {
-                        balance = new LeaveBalance
-                        {
-                            UserId = account.UserId,
-                            Year = year,
-                            TotalDays = 12,
-                            UsedDays = 0,
-                            RemainingDays = 12
-                        };
-                        _db.LeaveBalances.Add(balance);
-                        await _db.SaveChangesAsync();
-                    }
+                        .FirstOrDefaultAsync(b => b.UserId == account.UserId && b.Year == year)
+                        ?? throw new RequestWorkflowException($"Không tìm thấy dữ liệu phép năm {year} cho nhân viên này.");
 
                     var days = (int)entity.Value;
 
@@ -259,7 +317,7 @@ namespace HRMS.Application.Services
         // =====================================================================
         // 3. REJECT REQUEST
         // =====================================================================
-        public async Task RejectRequestAsync(int requestId, int approverAccountId, string? note = null)
+        public async Task RejectRequestAsync(int requestId, int approverAccountId)
         {
             Request entity;
 
@@ -277,6 +335,7 @@ namespace HRMS.Application.Services
                     throw new RequestWorkflowException("Bạn không phải là người được phân công duyệt đơn này.");
 
                 entity.Status = RequestStatuses.Rejected;
+                entity.CurrentApproverAccountId = approverAccountId; // ghi lại đúng người THỰC SỰ từ chối (quan trọng khi Giám đốc override)
 
                 await _db.SaveChangesAsync();
             }
@@ -371,10 +430,12 @@ namespace HRMS.Application.Services
 
             await using (await _gate.EnterAsync())
             {
-                var query = _db.Requests
-                    .Include(r => r.RequestType)
+                var query = _db.Requests.Include(r => r.RequestType)
                     .Where(r => r.Status == RequestStatuses.Approved || r.Status == RequestStatuses.Rejected);
 
+                // Giám đốc thấy TOÀN BỘ lịch sử đã xử lý của công ty (đồng bộ với quyền "duyệt được mọi đơn").
+                // Người khác chỉ thấy đơn CHÍNH MÌNH đã Duyệt/Từ chối (nhờ CurrentApproverAccountId được
+                // ghi đè đúng người thực hiện tại thời điểm Approve/Reject, xem ApproveRequestAsync/RejectRequestAsync).
                 if (!isDirector)
                     query = query.Where(r => r.CurrentApproverAccountId == approverAccountId);
 
