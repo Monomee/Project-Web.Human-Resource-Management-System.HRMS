@@ -178,15 +178,15 @@
     }
 </div>
 
-<!-- Create Account Modal -->
+
 <CreateAccountModal IsOpen="@isCreateModalOpen" OnClose="@CloseCreateModal"
                     OnSave="@HandleCreateAccount" Employees="@employeeList" Roles="@roleList" />
 
-<!-- Edit Account Modal -->
+
 <EditAccountModal IsOpen="@isEditModalOpen" OnClose="@CloseEditModal"
                   OnSave="@HandleUpdateAccount" AccountData="@selectedAccount" Roles="@roleList" />
 
-<!-- Reset Password Confirmation Modal -->
+
 @if (showResetPasswordModal)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7); z-index: 1050;">
@@ -236,7 +236,7 @@
 
 @code {
     private List<AccountDto>? accounts;
-    private List<AccountDto>? allAccounts; // Store all accounts before filtering
+    private List<AccountDto>? allAccounts; 
     private List<EmployeeDto> employeeList = new();
     private List<RoleDto> roleList = new();
     private List<RoleDto> roles = new();
@@ -244,29 +244,28 @@
     private string message = string.Empty;
     private string alertClass = "success";
     
-    // Modal states
+  
     private bool isCreateModalOpen = false;
     private bool isEditModalOpen = false;
     private bool showResetPasswordModal = false;
     private bool showDeleteModal = false;
-    
-    // Selected items
+  
     private UpdateAccountDto? selectedAccount = null;
     private int resetPasswordAccountId = 0;
     private int deleteAccountId = 0;
 
-    // Current user
+   
     private int currentAccountId = 0;
     private string currentUserRole = string.Empty;
     private bool isAdmin = false;
     private AccountDto? currentUserAccount = null;
 
-    // Filter variables
+  
     private string searchKeyword = string.Empty;
     private string filterRoleId = string.Empty;
     private string filterStatus = string.Empty;
 
-    // Computed property for filtered accounts
+   
     private IEnumerable<AccountDto> filteredAccounts
     {
         get
@@ -276,7 +275,7 @@
 
             var result = accounts.AsEnumerable();
 
-            // Search keyword filter
+          
             if (!string.IsNullOrWhiteSpace(searchKeyword))
             {
                 var keyword = searchKeyword.Trim().ToLower();
@@ -288,7 +287,6 @@
                 );
             }
 
-            // Role filter
             if (!string.IsNullOrWhiteSpace(filterRoleId))
             {
                 if (int.TryParse(filterRoleId, out int roleId))
@@ -297,7 +295,7 @@
                 }
             }
 
-            // Status filter
+       
             if (!string.IsNullOrWhiteSpace(filterStatus))
             {
                 if (bool.TryParse(filterStatus, out bool status))
@@ -325,16 +323,16 @@
             
             if (user.Identity?.IsAuthenticated == true)
             {
-                // Get AccountId
+               
                 var accountIdClaim = user.Claims.FirstOrDefault(c => c.Type == "AccountId");
                 if (accountIdClaim != null && int.TryParse(accountIdClaim.Value, out int accId))
                 {
                     currentAccountId = accId;
                     
-                    // Special handling for hardcoded admin account (Id = -1)
+                   
                     if (accId == -1)
                     {
-                        // Create fake AccountDto for admin
+                        
                         var fullNameClaim = user.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Name);
                         currentUserAccount = new AccountDto
                         {
@@ -352,12 +350,12 @@
                     }
                     else
                     {
-                        // Load current user's account details from database
+                       
                         currentUserAccount = await AccountService.GetByIdAsync(accId);
                     }
                 }
                 
-                // Get Role
+              
                 var roleClaim = user.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role);
                 if (roleClaim != null)
                 {
@@ -381,7 +379,7 @@
         {
             allAccounts = await AccountService.GetAllAsync();
             
-            // Filter accounts based on user permission
+           
             if (currentUserAccount != null)
             {
                 accounts = AuthorizationHelper.FilterAccountsByPermission(currentUserAccount, allAccounts);
@@ -393,7 +391,7 @@
             
             employeeList = await EmployeeService.GetEmployeesWithDetailsAsync();
             roleList = await RoleService.GetAllAsync();
-            roles = roleList; // Populate roles for dropdown
+            roles = roleList; 
         }
         catch (Exception ex)
         {
@@ -408,9 +406,7 @@
         filterRoleId = string.Empty;
         filterStatus = string.Empty;
     }
-
-    // Create
-    private void ShowCreateModal()
+  private void ShowCreateModal()
     {
         isCreateModalOpen = true;
         message = string.Empty;

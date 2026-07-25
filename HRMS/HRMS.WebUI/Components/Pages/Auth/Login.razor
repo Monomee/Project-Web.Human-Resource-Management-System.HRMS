@@ -345,7 +345,7 @@
 
         try
         {
-            // Kiểm tra thông tin tài khoản qua dịch vụ AuthService
+            
             var authResult = await AuthService.LoginAsync(_loginInput.Username, _loginInput.Password);
 
             if (!authResult.Success)
@@ -355,7 +355,7 @@
                 return;
             }
 
-            // Tạo danh sách Claims từ kết quả đăng nhập thành công
+            
             var claims = new List<Claim>
             {
                 new Claim("AccountId", authResult.AccountId.ToString()), // For self-edit detection
@@ -363,7 +363,7 @@
                 new Claim(ClaimTypes.Name, authResult.FullName)
             };
 
-            // Nạp toàn bộ Roles vào Claims
+            
             foreach (var role in authResult.Roles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role));
@@ -372,10 +372,10 @@
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             var principal = new ClaimsPrincipal(identity);
 
-            // Sinh Token tạm thời và đẩy Claims vào Store
+            
             var tempToken = TokenStore.GenerateToken(principal);
 
-            // Redirect force load đến Endpoint ghi Cookie để thiết lập Cookie Session
+            
             NavigationManager.NavigateTo($"/auth/signin?token={tempToken}", forceLoad: true);
         }
         catch (Exception ex)
