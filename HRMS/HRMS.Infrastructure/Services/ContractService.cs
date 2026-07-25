@@ -7,14 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HRMS.Infrastructure.Services;
 
-/// <summary>
-/// Service implementation for managing employment contracts
-/// Business Rules:
-/// - Only HR role can create contracts
-/// - Default status is "Pending" when created
-/// - Contracts are immutable (cannot be edited once created)
-/// - EndDate must be >= StartDate
-/// </summary>
+
 public class ContractService : IContractService
 {
     private readonly ApplicationDbContext _context;
@@ -24,9 +17,6 @@ public class ContractService : IContractService
         _context = context;
     }
 
-    /// <summary>
-    /// Get all contracts for a specific user/employee
-    /// </summary>
     public async Task<List<ContractDto>> GetContractsByUserIdAsync(int userId)
     {
         var contracts = await _context.EmploymentContracts
@@ -48,26 +38,23 @@ public class ContractService : IContractService
         return contracts;
     }
 
-    /// <summary>
-    /// Create a new employment contract
-    /// Business rule: Initial status is always "Pending"
-    /// </summary>
+    
     public async Task<ContractDto> CreateAsync(CreateContractDto dto)
     {
-        // Validate business rules
+       
         if (dto.EndDate < dto.StartDate)
         {
             throw new BusinessException("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.");
         }
 
-        // Check if user exists
+       
         var userExists = await _context.Users.AnyAsync(u => u.Id == dto.UserId);
         if (!userExists)
         {
             throw new BusinessException("Nhân viên không tồn tại trong hệ thống.");
         }
 
-        // Generate contract number (format: HD001, HD002, etc.)
+       
         var maxContractNo = await _context.EmploymentContracts
             .OrderByDescending(c => c.Id)
             .Select(c => c.ContractNo)
@@ -80,7 +67,7 @@ public class ContractService : IContractService
         }
         else
         {
-            // Extract number part (assuming format HDxxx)
+            
             var numberPart = maxContractNo.Substring(2);
             if (int.TryParse(numberPart, out int lastNumber))
             {
@@ -92,7 +79,7 @@ public class ContractService : IContractService
             }
         }
 
-        // Create new contract with status "Pending" (awaiting HRM approval)
+        
         var contract = new EmploymentContract
         {
             ContractNo = newContractNo,
@@ -100,14 +87,14 @@ public class ContractService : IContractService
             BaseSalary = dto.BaseSalary,
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
-            Status = "Pending", // Status is Pending by default (HR creates → HRM approves)
+            Status = "Pending", 
             UserId = dto.UserId
         };
 
         _context.EmploymentContracts.Add(contract);
         await _context.SaveChangesAsync();
 
-        // Return created contract
+ 
         return new ContractDto
         {
             Id = contract.Id,
@@ -121,41 +108,35 @@ public class ContractService : IContractService
         };
     }
 
-    /// <summary>
-    /// Update an existing employment contract
-    /// Business Rules:
-    /// - Only contracts with status "Pending" or "Rejected" can be edited
-    /// - When updating a "Rejected" contract, status automatically changes back to "Pending"
-    /// Authorization: Only HR and HRM roles can update
-    /// </summary>
+    
     public async Task<bool> UpdateAsync(UpdateContractDto dto)
     {
-        // Validate business rules
+        
         if (dto.EndDate < dto.StartDate)
         {
             throw new BusinessException("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.");
         }
 
-        // Find existing contract
+        
         var contract = await _context.EmploymentContracts.FindAsync(dto.Id);
         if (contract == null)
         {
             return false;
         }
 
-        // Business Rule: Only Pending or Rejected contracts can be edited
+        
         if (contract.Status != "Pending" && contract.Status != "Rejected")
         {
             throw new BusinessException("Chỉ có thể chỉnh sửa hợp đồng đang ở trạng thái 'Chờ duyệt' hoặc 'Từ chối'.");
         }
 
-        // Update fields
+        
         contract.ContractType = dto.ContractType;
         contract.BaseSalary = dto.BaseSalary;
         contract.StartDate = dto.StartDate;
         contract.EndDate = dto.EndDate;
 
-        // Business Rule: When updating a Rejected contract, change status back to Pending
+        
         if (contract.Status == "Rejected")
         {
             contract.Status = "Pending";
@@ -169,9 +150,6 @@ public class ContractService : IContractService
         return true;
     }
 
-    /// <summary>
-    /// Get contract types (distinct values from database)
-    /// </summary>
     public async Task<List<string>> GetContractTypesAsync()
     {
         var types = await _context.EmploymentContracts
@@ -180,7 +158,7 @@ public class ContractService : IContractService
             .OrderBy(t => t)
             .ToListAsync();
 
-        // If no types exist, return default types (English)
+        
         if (!types.Any())
         {
             return new List<string>
@@ -194,10 +172,7 @@ public class ContractService : IContractService
         return types;
     }
 
-    /// <summary>
-    /// Approve a contract (change status from Pending to Active)
-    /// Authorization: Only HRM role can approve
-    /// </summary>
+    
     public async Task<bool> ApproveContractAsync(int contractId)
     {
         var contract = await _context.EmploymentContracts.FindAsync(contractId);
@@ -217,10 +192,7 @@ public class ContractService : IContractService
         return true;
     }
 
-    /// <summary>
-    /// Reject a contract (change status from Pending to Rejected)
-    /// Authorization: Only HRM role can reject
-    /// </summary>
+    
     public async Task<bool> RejectContractAsync(int contractId, string reason)
     {
         var contract = await _context.EmploymentContracts.FindAsync(contractId);
@@ -235,16 +207,13 @@ public class ContractService : IContractService
         }
 
         contract.Status = "Rejected";
-        contract.Reason = reason; // Save rejection reason
+        contract.Reason = reason; 
         await _context.SaveChangesAsync();
 
         return true;
     }
 
-    /// <summary>
-    /// Terminate a contract (change Active contract to terminated)
-    /// Authorization: Only HRM role can terminate
-    /// </summary>
+    
     public async Task<bool> TerminateContractAsync(int contractId, string reason)
     {
         var contract = await _context.EmploymentContracts.FindAsync(contractId);
