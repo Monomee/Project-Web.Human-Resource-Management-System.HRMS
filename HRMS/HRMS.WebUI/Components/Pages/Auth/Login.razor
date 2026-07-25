@@ -358,7 +358,7 @@
             
             var claims = new List<Claim>
             {
-                new Claim("AccountId", authResult.AccountId.ToString()), // For self-edit detection
+                new Claim("AccountId", authResult.AccountId.ToString()), 
                 new Claim(ClaimTypes.NameIdentifier, authResult.AccountId.ToString()),
                 new Claim(ClaimTypes.Name, authResult.FullName)
             };
