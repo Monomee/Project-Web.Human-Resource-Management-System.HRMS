@@ -15,10 +15,13 @@
                         <DataAnnotationsValidator />
 
                         <div class="row g-3">
-                            <!-- Username -->
+                            <!-- Username (Readonly) -->
                             <div class="col-md-6">
-                                <label class="form-label-dark">Username <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control-dark" @bind="model.Username" placeholder="username" />
+                                <label class="form-label-dark">Username</label>
+                                <input type="text" class="form-control-dark" @bind="model.Username" placeholder="username" disabled readonly />
+                                <small class="text-muted-small">
+                                    <i class="bi bi-info-circle me-1"></i>Username không thể thay đổi
+                                </small>
                             </div>
 
                             <!-- Status -->
@@ -34,7 +37,7 @@
                             <div class="col-12">
                                 <label class="form-label-dark">Vai trò <span class="text-danger">*</span></label>
                                 <div class="roles-checkbox-group">
-                                    @foreach (var role in Roles)
+                                    @foreach (var role in Roles.Where(r => r.Name != "Admin"))
                                     {
                                         <div class="form-check-dark">
                                             <input class="form-check-input" 
@@ -49,6 +52,9 @@
                                         </div>
                                     }
                                 </div>
+                                <small class="text-muted-small mt-2">
+                                    <i class="bi bi-info-circle me-1"></i>Admin role không khả dụng (chỉ có 1 admin trong hệ thống)
+                                </small>
                             </div>
                         </div>
 
@@ -165,6 +171,21 @@
         background: rgba(30, 41, 59, 0.8) !important;
         border-color: rgba(59, 130, 246, 0.5);
         box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15);
+    }
+
+    .form-control-dark:disabled {
+        background: rgba(30, 41, 59, 0.3) !important;
+        border-color: rgba(255, 255, 255, 0.05);
+        color: #94a3b8 !important;
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+
+    .text-muted-small {
+        color: #64748b;
+        font-size: 0.8rem;
+        display: block;
+        margin-top: 0.35rem;
     }
 
     .roles-checkbox-group {

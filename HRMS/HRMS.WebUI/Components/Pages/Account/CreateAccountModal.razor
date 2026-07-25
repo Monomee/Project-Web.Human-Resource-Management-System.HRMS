@@ -52,7 +52,7 @@
                             <div class="col-12">
                                 <label class="form-label-dark">Vai trò <span class="text-danger">*</span></label>
                                 <div class="roles-checkbox-group">
-                                    @foreach (var role in Roles)
+                                    @foreach (var role in Roles.Where(r => r.Name != "Admin"))
                                     {
                                         <div class="form-check-dark">
                                             <input class="form-check-input" 
@@ -67,6 +67,9 @@
                                         </div>
                                     }
                                 </div>
+                                <small class="text-muted-small mt-2">
+                                    <i class="bi bi-info-circle me-1"></i>Admin role không khả dụng (chỉ có 1 admin trong hệ thống)
+                                </small>
                             </div>
                         </div>
 
@@ -246,5 +249,12 @@
 
     .text-danger {
         color: #ef4444;
+    }
+
+    .text-muted-small {
+        color: #64748b;
+        font-size: 0.8rem;
+        display: block;
+        margin-top: 0.35rem;
     }
 </style>
