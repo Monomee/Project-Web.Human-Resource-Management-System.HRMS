@@ -13,16 +13,12 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ----------------------------------------------------------------------------
-// Add services to the container.
-// ----------------------------------------------------------------------------
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddApplicationServices();
 builder.Services.AddRazorPages();
 
-// Cookie Authentication cho Blazor Server
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -38,14 +34,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
-// TempTokenStore: chuyển tiếp Claims từ Interactive Server sang HTTP Endpoint để ghi Cookie
 builder.Services.AddSingleton<TempTokenStore>();
 
-// ----------------------------------------------------------------------------
-// Module Request Workflow (Task 3.2)
-// DB / DbConcurrencyGate / IEmployeeLookup đã được đăng ký sẵn bên trong
-// AddInfrastructureServices() ở trên - chỉ còn thiếu 2 dòng dưới đây.
-// ----------------------------------------------------------------------------
 builder.Services.AddScoped<IRequestService, RequestService>();
 builder.Services.AddScoped<IRequestNotifier, SignalRRequestNotifier>();
 
@@ -53,9 +43,7 @@ builder.Services.AddSignalR();
 
 var app = builder.Build();
 
-// ----------------------------------------------------------------------------
-// Configure the HTTP request pipeline.
-// ----------------------------------------------------------------------------
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -67,10 +55,8 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// UseAntiforgery() phải đặt SAU UseAuthentication/UseAuthorization theo khuyến nghị của Microsoft
 app.UseAntiforgery();
 
-// Endpoint phụ trợ để ghi Cookie (SignalR/Blazor Server không hỗ trợ ghi Header trực tiếp)
 app.MapGet("/auth/signin", async (string token, TempTokenStore tokenStore, HttpContext httpContext) =>
 {
     var principal = tokenStore.GetAndRemove(token);
