@@ -31,7 +31,7 @@ public class AuthService : IAuthService
             };
         }
 
-        // PRIORITY 1: Check Admin account from appsettings (hardcoded, not in database)
+        
         var adminUsername = _configuration["AdminAccount:Username"];
         var adminPassword = _configuration["AdminAccount:Password"];
         var adminFullName = _configuration["AdminAccount:FullName"] ?? "System Administrator";
@@ -45,13 +45,13 @@ public class AuthService : IAuthService
             return new AuthResult
             {
                 Success = true,
-                AccountId = -1, // Special ID for admin (not in database)
+                AccountId = -1, 
                 FullName = adminFullName,
                 Roles = new List<string> { "Admin" }
             };
         }
 
-        // PRIORITY 2: Check regular accounts from database
+        
         var account = await _dbContext.Accounts
             .Include(a => a.User)
             .Include(a => a.Roles)
@@ -66,7 +66,7 @@ public class AuthService : IAuthService
             };
         }
 
-        // Chỉ cho phép tài khoản có Status == true đăng nhập
+       
         if (!account.Status)
         {
             return new AuthResult
@@ -76,7 +76,7 @@ public class AuthService : IAuthService
             };
         }
 
-        // Kiểm tra mật khẩu bằng BCrypt
+   
         bool isPasswordValid = false;
         try
         {
@@ -84,7 +84,7 @@ public class AuthService : IAuthService
         }
         catch (Exception)
         {
-            // Tránh văng lỗi nếu hash trong DB sai định dạng
+        
             isPasswordValid = false;
         }
 
@@ -97,7 +97,7 @@ public class AuthService : IAuthService
             };
         }
 
-        // Đăng nhập thành công, thu thập danh sách tên quyền (Roles)
+       
         var roles = account.Roles.Select(r => r.Name).ToList();
 
         // Trả về kết quả
@@ -119,7 +119,7 @@ public class AuthService : IAuthService
         if (account == null)
             return false;
 
-        // Kiểm tra mật khẩu cũ bằng BCrypt
+
         bool isPasswordValid = false;
         try
         {
@@ -133,7 +133,6 @@ public class AuthService : IAuthService
         if (!isPasswordValid)
             return false;
 
-        // Hash mật khẩu mới và lưu
         account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
         await _dbContext.SaveChangesAsync();
         return true;
