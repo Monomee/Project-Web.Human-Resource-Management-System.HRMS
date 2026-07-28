@@ -208,6 +208,10 @@ CREATE TABLE Payslips (
     CONSTRAINT FK_Payslips_Users FOREIGN KEY (UserId) REFERENCES Users(Id),
     CONSTRAINT FK_Payslips_Periods FOREIGN KEY (PeriodId) REFERENCES TimesheetPeriods(Id)
 );
+
+ALTER TABLE EmploymentContracts
+ALTER COLUMN ContractType NVARCHAR(100) NOT NULL;
+
 GO
 ```
 
